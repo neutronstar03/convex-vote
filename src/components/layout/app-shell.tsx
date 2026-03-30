@@ -5,7 +5,7 @@ import type { PropsWithChildren } from 'react'
 export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className="min-h-screen bg-[var(--ash-graphite)] text-[var(--cloud-tint)]" data-testid="app-shell">
-      <header className="border-b border-[var(--steel-haze)]/80 bg-[color:rgba(19,20,22,0.78)] backdrop-blur" data-testid="navbar">
+      <header className="border-b border-[var(--steel-haze)] bg-[var(--slate-machine)]/95 backdrop-blur" data-testid="navbar">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div data-testid="navbar-brand">
             <Link to="/" className="text-lg font-semibold tracking-tight text-[var(--cloud-tint)]" data-testid="navbar-home-link">

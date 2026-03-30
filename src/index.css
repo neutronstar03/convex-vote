@@ -41,3 +41,45 @@ a {
 * {
   box-sizing: border-box;
 }
+
+[data-testid='rainbowkit-connect-button'] button {
+  border-radius: 0.5rem !important;
+  border: 1px solid var(--steel-haze) !important;
+  box-shadow: none !important;
+  transition: background-color 150ms ease, border-color 150ms ease, filter 150ms ease !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:only-child {
+  background:
+    linear-gradient(90deg, rgba(176, 38, 255, 0.22) 0%, rgba(120, 218, 228, 0.14) 100%),
+    var(--carbon-ink) !important;
+  border-color: var(--steel-haze) !important;
+  color: var(--cloud-tint) !important;
+  box-shadow: inset 0 0 0 1px rgba(120, 218, 228, 0.1) !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:only-child:hover {
+  background:
+    linear-gradient(90deg, rgba(176, 38, 255, 0.28) 0%, rgba(120, 218, 228, 0.2) 100%),
+    var(--gunmetal-mist) !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:first-child:not(:only-child) {
+  background: var(--carbon-ink) !important;
+  border-color: var(--steel-haze) !important;
+  color: var(--dust-tint) !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:last-child:not(:only-child) {
+  background: rgba(120, 218, 228, 0.14) !important;
+  border-color: rgba(120, 218, 228, 0.45) !important;
+  color: var(--cloud-tint) !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:first-child:not(:only-child):hover {
+  background: var(--gunmetal-mist) !important;
+}
+
+[data-testid='rainbowkit-connect-button'] button:last-child:not(:only-child):hover {
+  background: rgba(120, 218, 228, 0.2) !important;
+}
