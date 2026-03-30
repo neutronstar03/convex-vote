@@ -18,3 +18,31 @@ export function getCountdownParts(timestamp: number) {
 
   return { days, hours, minutes }
 }
+
+export function getEstimatedNextVoteStart(proposals: SnapshotProposal[], currentProposal?: SnapshotProposal | null) {
+  if (!currentProposal) {
+    return null
+  }
+
+  const filtered = proposals.filter(isMainGaugeProposal)
+  const currentIndex = filtered.findIndex(proposal => proposal.id === currentProposal.id)
+
+  if (currentIndex === -1) {
+    return null
+  }
+
+  const current = filtered[currentIndex]
+  const previous = filtered[currentIndex + 1]
+
+  if (!current || !previous) {
+    return null
+  }
+
+  const cadence = current.start - previous.start
+
+  if (cadence <= 0) {
+    return null
+  }
+
+  return current.start + cadence
+}

@@ -1,6 +1,24 @@
 import type { LlamaEpoch } from './types'
 import type { PoolRow, SnapshotProposal } from '../proposal/types'
 
+export function getBribedChoiceIndexes(epoch: LlamaEpoch | null) {
+  return [...new Set(
+    (epoch?.bribes ?? [])
+      .map(bribe => bribe.choice)
+      .filter((choice): choice is number => typeof choice === 'number' && choice > 0),
+  )]
+}
+
+export function getBribedVotesTotal(proposal: SnapshotProposal, epoch: LlamaEpoch | null) {
+  const bribedChoices = getBribedChoiceIndexes(epoch)
+
+  if (bribedChoices.length === 0) {
+    return proposal.scores_total
+  }
+
+  return bribedChoices.reduce((sum, choiceIndex) => sum + (proposal.scores[choiceIndex - 1] ?? 0), 0)
+}
+
 export function mergeProposalAndEpoch(proposal: SnapshotProposal, epoch: LlamaEpoch | null): PoolRow[] {
   const bribesByChoice = new Map<number, PoolRow['bribeTokens']>()
   const incentiveUsdByChoice = new Map<number, number>()

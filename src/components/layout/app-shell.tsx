@@ -1,13 +1,14 @@
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Link } from 'react-router'
 import type { PropsWithChildren } from 'react'
 
 export function AppShell({ children }: PropsWithChildren) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <div>
-            <Link to="/" className="text-lg font-semibold tracking-tight text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100" data-testid="app-shell">
+      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur" data-testid="navbar">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <div data-testid="navbar-brand">
+            <Link to="/" className="text-lg font-semibold tracking-tight text-white" data-testid="navbar-home-link">
               Convex Vote
             </Link>
             <p className="text-sm text-slate-400">
@@ -15,13 +16,13 @@ export function AppShell({ children }: PropsWithChildren) {
             </p>
           </div>
 
-          <div className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-            Wallet connection disabled for now
+          <div data-testid="rainbowkit-connect-button">
+            <ConnectButton showBalance={false} chainStatus="icon" />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-5" data-testid="app-main">
         {children}
       </main>
     </div>

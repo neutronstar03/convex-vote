@@ -1,8 +1,9 @@
 import { useParams } from 'react-router'
 import { AppShell } from '../components/layout/app-shell'
+import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
 import { useResolvedProposal } from '../features/proposal/queries'
 import { useEpochForProposal } from '../features/incentives/queries'
-import { mergeProposalAndEpoch } from '../features/incentives/utils'
+import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
 import { formatDateTime, formatNumber, formatPercent, formatUsd } from '../lib/format'
 import { getCountdownParts } from '../features/proposal/utils'
 
@@ -37,9 +38,19 @@ export function ProposalRoute() {
     .sort((a, b) => (b.incentiveUsd ?? 0) - (a.incentiveUsd ?? 0) || b.snapshotVotes - a.snapshotVotes)
     .slice(0, 12)
   const countdown = getCountdownParts(proposal.end)
+  const totalIncentivesUsd = epoch?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
+  const summaryVotes = getBribedVotesTotal(proposal, epoch)
 
   return (
     <AppShell>
+      <VoteSummaryStats
+        roundNumber={epoch?.round}
+        totalVotes={summaryVotes}
+        totalIncentivesUsd={totalIncentivesUsd}
+        deadline={proposal.end}
+        countdown={`${countdown.days}d ${countdown.hours}h ${countdown.minutes}m`}
+      />
+
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
         <article className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 xl:col-span-2">
           <p className="text-sm uppercase tracking-[0.24em] text-violet-200">Live Snapshot round</p>

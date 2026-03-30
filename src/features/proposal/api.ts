@@ -1,4 +1,4 @@
-import type { SnapshotProposal, SnapshotProposalResponse } from './types'
+import type { SnapshotProposal, SnapshotProposalResponse, SnapshotVote } from './types'
 
 const SNAPSHOT_GRAPHQL_URL = 'https://hub.snapshot.org/graphql'
 
@@ -74,4 +74,24 @@ export async function fetchProposalById(id: string) {
   }
 
   return data.proposal
+}
+
+export async function fetchUserVote(proposalId: string, voter: string) {
+  const data = await snapshotRequest<{ votes: SnapshotVote[] }>(`
+    query UserVote {
+      votes(
+        first: 1
+        where: { proposal: "${proposalId}", voter: "${voter}" }
+        orderBy: "created"
+        orderDirection: desc
+      ) {
+        voter
+        choice
+        vp
+        created
+      }
+    }
+  `)
+
+  return data.votes[0] ?? null
 }

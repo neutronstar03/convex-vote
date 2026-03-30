@@ -13,6 +13,13 @@ export type SnapshotProposalResponse = {
   proposals: SnapshotProposal[]
 }
 
+export type SnapshotVote = {
+  voter: string
+  choice: number | Record<string, number>
+  vp: number
+  created: number
+}
+
 export type PoolRow = {
   choiceIndex: number
   choiceKey: string

@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchProposalById, fetchRecentGaugeProposals } from './api'
+import { fetchProposalById, fetchRecentGaugeProposals, fetchUserVote } from './api'
 import { getActiveOrLatestMainGaugeProposal } from './utils'
+
+export function useRecentGaugeProposals() {
+  return useQuery({
+    queryKey: ['proposals', 'recent-gauge'],
+    queryFn: fetchRecentGaugeProposals,
+  })
+}
 
 export function useResolvedProposal(proposalId?: string) {
   return useQuery({
@@ -19,5 +26,13 @@ export function useResolvedProposal(proposalId?: string) {
 
       return fetchProposalById(proposalId)
     },
+  })
+}
+
+export function useUserVote(proposalId?: string, voter?: string) {
+  return useQuery({
+    queryKey: ['vote', proposalId, voter],
+    queryFn: () => fetchUserVote(proposalId!, voter!),
+    enabled: Boolean(proposalId && voter),
   })
 }

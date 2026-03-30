@@ -1,13 +1,23 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { APP_NAME } from '../../lib/constants'
+import { coinbaseWallet, injected, metaMask } from 'wagmi/connectors'
+import { createConfig, http } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
 
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? 'demo-project-id'
-
-export const wagmiConfig = getDefaultConfig({
-  appName: 'Convex Vote',
-  appDescription: 'Custom Snapshot voting UI for Convex gauge rounds',
-  appUrl: 'http://localhost:5173',
-  projectId,
+export const wagmiConfig = createConfig({
   chains: [mainnet],
-  ssr: false,
+  connectors: [
+    injected(),
+    metaMask({
+      dappMetadata: {
+        name: APP_NAME,
+        url: 'http://localhost:5173',
+      },
+    }),
+    coinbaseWallet({
+      appName: APP_NAME,
+    }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+  },
 })
