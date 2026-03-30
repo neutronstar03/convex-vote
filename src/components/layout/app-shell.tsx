@@ -4,14 +4,14 @@ import type { PropsWithChildren } from 'react'
 
 export function AppShell({ children }: PropsWithChildren) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100" data-testid="app-shell">
-      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur" data-testid="navbar">
+    <div className="min-h-screen bg-[var(--ash-graphite)] text-[var(--cloud-tint)]" data-testid="app-shell">
+      <header className="border-b border-[var(--steel-haze)]/80 bg-[color:rgba(19,20,22,0.78)] backdrop-blur" data-testid="navbar">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div data-testid="navbar-brand">
-            <Link to="/" className="text-lg font-semibold tracking-tight text-white" data-testid="navbar-home-link">
+            <Link to="/" className="text-lg font-semibold tracking-tight text-[var(--cloud-tint)]" data-testid="navbar-home-link">
               Convex Vote
             </Link>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-[var(--dust-tint)]">
               Snapshot voting dashboard for cvx.eth gauge rounds.
             </p>
           </div>
