@@ -24,6 +24,10 @@ export function ProposalRoute() {
   const { address } = useAccount()
   const [searchParams] = useSearchParams()
   const [sortKey, setSortKey] = useState<SortKey>('incentives')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [rewardTokenFilter, setRewardTokenFilter] = useState('all')
+  const [showOnlyWalletVotes, setShowOnlyWalletVotes] = useState(false)
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null)
   const proposalQuery = useResolvedProposal(proposalId)
   const epochQuery = useEpochForProposal(proposalQuery.data?.id)
   const watchParam = searchParams.get('watch')?.trim()
@@ -38,10 +42,6 @@ export function ProposalRoute() {
   const bribedRows = useMemo(
     () => proposal ? mergeProposalAndEpoch(proposal, epoch).filter(row => (row.incentiveUsd ?? 0) > 0 || row.bribeTokens.length > 0) : [],
     [epoch, proposal],
-  )
-  const sortedRows = useMemo(
-    () => [...bribedRows].sort((a, b) => compareRows(a, b, sortKey)),
-    [bribedRows, sortKey],
   )
   const walletVoteRecap = useMemo(
     () => proposal && voteQuery.data ? getWalletVoteRecap(voteQuery.data, proposal, bribedRows) : [],
@@ -61,6 +61,36 @@ export function ProposalRoute() {
   const rewardRate = totalIncentivesUsd !== undefined && bribedRows.length > 0
     ? totalIncentivesUsd / bribedRows.reduce((sum, row) => sum + row.snapshotVotes, 0)
     : undefined
+  const rewardTokenOptions = useMemo(
+    () => ['all', ...new Set(bribedRows.flatMap(row => row.bribeTokens.map(token => token.symbol)).sort())],
+    [bribedRows],
+  )
+  const filteredRows = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return bribedRows.filter((row) => {
+      if (rewardTokenFilter !== 'all' && !row.bribeTokens.some(token => token.symbol === rewardTokenFilter)) {
+        return false
+      }
+
+      if (showOnlyWalletVotes && !walletChoiceKeys.has(row.choiceKey)) {
+        return false
+      }
+
+      if (!normalizedSearch) {
+        return true
+      }
+
+      return row.label.toLowerCase().includes(normalizedSearch)
+        || row.bribeTokens.some(token => token.symbol.toLowerCase().includes(normalizedSearch))
+        || row.gaugeAddress?.toLowerCase().includes(normalizedSearch)
+        || row.choiceKey.includes(normalizedSearch)
+    })
+  }, [bribedRows, rewardTokenFilter, searchTerm, showOnlyWalletVotes, walletChoiceKeys])
+  const sortedRows = useMemo(
+    () => [...filteredRows].sort((a, b) => compareRows(a, b, sortKey)),
+    [filteredRows, sortKey],
+  )
 
   if (proposalQuery.isPending) {
     return (
@@ -88,6 +118,17 @@ export function ProposalRoute() {
     : resolvedProposal.state.toLowerCase() === 'active'
         ? `Ends ${formatDateTime(resolvedProposal.end)}`
         : resolvedProposal.state
+
+  const handleCopy = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedLabel(label)
+      window.setTimeout(() => setCopiedLabel(current => current === label ? null : current), 1500)
+    } catch {
+      setCopiedLabel(`Failed: ${label}`)
+      window.setTimeout(() => setCopiedLabel(current => current === `Failed: ${label}` ? null : current), 1500)
+    }
+  }
 
   return (
     <AppShell>
@@ -151,6 +192,10 @@ export function ProposalRoute() {
             <DetailRow label="Reward tokens" value={summarizeRewardTokens(bribedRows)} />
             <DetailRow label="Wallet" value={activeAddress ? shortAddress(activeAddress) : 'Not selected'} />
           </dl>
+
+          {copiedLabel
+            ? <p className="mt-4 text-xs text-[var(--pearl-aqua)]">{copiedLabel}</p>
+            : null}
         </article>
       </section>
 
@@ -207,7 +252,28 @@ export function ProposalRoute() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-[var(--fog-tint)]">{sortedRows.length} bribed gauges in this round.</p>
+            <p className="text-sm text-[var(--fog-tint)]">Showing {sortedRows.length} of {bribedRows.length} bribed gauges.</p>
+            <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
+              Search
+              <input
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder="Pool, token, gauge"
+                className="w-44 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-2 text-sm text-[var(--cloud-tint)] outline-none"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
+              Reward token
+              <select
+                value={rewardTokenFilter}
+                onChange={event => setRewardTokenFilter(event.target.value)}
+                className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-2 text-sm text-[var(--cloud-tint)] outline-none"
+              >
+                {rewardTokenOptions.map(option => (
+                  <option key={option} value={option}>{option === 'all' ? 'All tokens' : option}</option>
+                ))}
+              </select>
+            </label>
             <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
               Sort by
               <select
@@ -220,10 +286,29 @@ export function ProposalRoute() {
                 ))}
               </select>
             </label>
+            {walletRows.length > 0
+              ? (
+                  <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
+                    <input
+                      type="checkbox"
+                      checked={showOnlyWalletVotes}
+                      onChange={event => setShowOnlyWalletVotes(event.target.checked)}
+                    />
+                    Only my voted gauges
+                  </label>
+                )
+              : null}
           </div>
         </div>
 
         <div className="mt-5 space-y-3">
+          {sortedRows.length === 0
+            ? (
+                <div className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-8 text-sm text-[var(--dust-tint)]">
+                  No gauges match the current search/filter combination.
+                </div>
+              )
+            : null}
           {sortedRows.map(row => {
             const isWalletRow = walletChoiceKeys.has(row.choiceKey)
 
@@ -247,6 +332,26 @@ export function ProposalRoute() {
                             <TokenChip key={`${row.choiceKey}-${token.symbol}`} symbol={token.symbol} amountUsd={token.amountUsd} />
                           ))
                         : <span className="text-xs text-[var(--fog-tint)]">No reward tokens detected</span>}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      {row.gaugeAddress
+                        ? (
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(row.gaugeAddress!, `Copied gauge ${shortAddress(row.gaugeAddress)}`)}
+                              className="rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/45 px-2.5 py-1 text-[var(--dust-tint)] transition hover:bg-[var(--gunmetal-mist)]"
+                            >
+                              Copy gauge
+                            </button>
+                          )
+                        : null}
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(row.label, `Copied pool ${row.label}`)}
+                        className="rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/45 px-2.5 py-1 text-[var(--dust-tint)] transition hover:bg-[var(--gunmetal-mist)]"
+                      >
+                        Copy pool name
+                      </button>
                     </div>
                   </div>
 
