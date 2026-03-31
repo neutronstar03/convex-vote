@@ -1,6 +1,9 @@
 import type { LlamaEpoch, LlamaEpochResponse, LlamaRoundSummary } from './types'
 
-const LLAMA_BASE_URL = 'https://api.llama.airforce/bribes/votium/cvx-crv'
+const LLAMA_BASE_URL = import.meta.env.VITE_LLAMA_API_BASE_URL
+  ?? (import.meta.env.DEV
+    ? '/api/llama/bribes/votium/cvx-crv'
+    : 'https://api.llama.airforce/bribes/votium/cvx-crv')
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)

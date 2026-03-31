@@ -47,9 +47,6 @@ export function ProposalRoute() {
         roundNumber={epoch?.round}
         totalVotes={summaryVotes}
         totalIncentivesUsd={totalIncentivesUsd}
-        start={proposal.start}
-        deadline={proposal.end}
-        countdown={`${countdown.days}d ${countdown.hours}h ${countdown.minutes}m`}
       />
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">

@@ -1,22 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, ExternalLink } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
+import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
 import { useEpochForProposal } from '../features/incentives/queries'
-import { getBribedVotesTotal } from '../features/incentives/utils'
+import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useRecentGaugeProposals, useResolvedProposal, useUserVote } from '../features/proposal/queries'
 import { getCountdownParts, getEstimatedNextVoteStart } from '../features/proposal/utils'
-import type { SnapshotProposal, SnapshotVote } from '../features/proposal/types'
-import { formatDateCompact, formatDateTimeCompact, formatDateTimeMs, formatNumber, getCurrentTimeZone } from '../lib/format'
+import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
+import { formatCompactUsd, formatDateCompact, formatDateTimeCompact, formatDateTimeMs, formatNumber, getCurrentTimeZone } from '../lib/format'
 
 export function HomeRoute() {
   const { address, isConnected } = useAccount()
+  const [searchParams] = useSearchParams()
   const proposalQuery = useResolvedProposal()
   const recentProposalsQuery = useRecentGaugeProposals()
   const epochQuery = useEpochForProposal(proposalQuery.data?.id)
-  const voteQuery = useUserVote(proposalQuery.data?.id, address)
+  const watchParam = searchParams.get('watch')?.trim()
+  const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
+  const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
+  const activeAddress = watchedAddress ?? address
+  const isWatchMode = Boolean(watchedAddress)
+  const voteQuery = useUserVote(proposalQuery.data?.id, activeAddress)
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -35,9 +42,20 @@ export function HomeRoute() {
     : null
   const currentVoteLabel = epochQuery.data?.round ? `Current vote ${epochQuery.data.round}` : 'Current vote'
   const snapshotProposalUrl = proposal ? `https://snapshot.box/#/cvx.eth/proposal/${proposal.id}` : 'https://snapshot.box/#/cvx.eth'
-  const voteRecap = proposal && voteQuery.data ? getVoteRecap(voteQuery.data, proposal) : []
   const totalIncentivesUsd = epochQuery.data?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
   const summaryVotes = proposal ? getBribedVotesTotal(proposal, epochQuery.data ?? null) : 0
+  const rewardRate = totalIncentivesUsd !== undefined && summaryVotes > 0
+    ? totalIncentivesUsd / summaryVotes
+    : undefined
+  const poolRows = useMemo(
+    () => proposal ? mergeProposalAndEpoch(proposal, epochQuery.data ?? null) : [],
+    [proposal, epochQuery.data],
+  )
+  const walletVoteRecap = useMemo(
+    () => proposal && voteQuery.data ? getWalletVoteRecap(voteQuery.data, proposal, poolRows) : [],
+    [poolRows, proposal, voteQuery.data],
+  )
+  const hasWalletVote = walletVoteRecap.length > 0
   const urgencyClass = voteWindow?.status === 'open' && voteWindow.totalHoursLeft !== undefined && voteWindow.totalHoursLeft < 6
     ? 'border-[var(--hot-fuchsia)]/50 bg-[color:rgba(255,22,84,0.12)] text-[var(--hot-fuchsia)]'
     : voteWindow?.status === 'open'
@@ -52,15 +70,18 @@ export function HomeRoute() {
               roundNumber={epochQuery.data?.round}
               totalVotes={summaryVotes}
               totalIncentivesUsd={totalIncentivesUsd}
-              start={proposal.start}
-              deadline={proposal.end}
-              countdown={voteWindow?.timerValue ?? '—'}
             />
           )
         : null}
 
-      <section className="grid gap-3 lg:grid-cols-[1.45fr_0.8fr]" data-testid="home-top-row">
-        <div className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5" data-testid="home-hero-pill">
+      <section
+        className={`grid gap-3 ${hasWalletVote ? 'lg:grid-cols-[1.15fr_0.75fr]' : 'lg:grid-cols-[1.45fr_0.8fr]'}`}
+        data-testid="home-top-row"
+      >
+        <div
+          className={`rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] ${hasWalletVote ? 'order-2 min-h-[200px] p-4' : 'order-1 p-5'}`}
+          data-testid="home-hero-pill"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -73,16 +94,25 @@ export function HomeRoute() {
               </div>
 
               <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-[var(--cloud-tint)]" data-testid="home-hero-title">
+                <h1 className={`${hasWalletVote ? 'text-2xl' : 'text-3xl'} font-semibold tracking-tight text-[var(--cloud-tint)]`} data-testid="home-hero-title">
                   {proposal?.title ?? 'Loading current Convex vote…'}
                 </h1>
                 <p className="mt-2 text-sm text-[var(--dust-tint)]" data-testid="home-local-time">
                   Local time {formatDateTimeMs(now)} · {timeZone}
                 </p>
+                {hasWalletVote
+                  ? (
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <CompactInfoChip label="Bribes" value={formatCompactUsd(totalIncentivesUsd)} tone="aqua" />
+                        <CompactInfoChip label="Bribe efficiency" value={rewardRate === undefined ? '—' : `$${rewardRate.toFixed(5)}`} tone="lime" />
+                        <CompactInfoChip label="Window" value={proposal ? formatDateCompact(proposal.end) : '—'} tone="neutral" />
+                      </div>
+                    )
+                  : null}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap gap-2 ${hasWalletVote ? 'self-end' : ''}`}>
               <Link
                 to="/proposal/latest"
                 data-testid="home-open-proposal-link"
@@ -105,36 +135,96 @@ export function HomeRoute() {
           </div>
         </div>
 
-        {isConnected && (
-          <aside className="rounded-lg border border-[var(--steel-haze)] bg-[var(--carbon-ink)] p-4" data-testid="wallet-vote-recap-pill">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--fog-tint)]">Current wallet vote</p>
-            <p className="mt-2 text-sm font-medium text-[var(--cloud-tint)]">{shortAddress(address)}</p>
+        {(activeAddress || hasInvalidWatchAddress || isConnected) && (
+          <aside
+            className={`rounded-lg border border-[var(--steel-haze)] bg-[var(--carbon-ink)] ${hasWalletVote ? 'order-1 p-5' : 'order-2 p-4'}`}
+            data-testid="wallet-vote-recap-pill"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--fog-tint)]">Current wallet vote</p>
+              {isWatchMode
+                ? <span className="rounded-md border border-[var(--pearl-aqua)]/40 bg-[color:rgba(120,218,228,0.1)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--pearl-aqua)]">Watching wallet</span>
+                : null}
+            </div>
 
-            {voteQuery.isPending
-              ? <p className="mt-3 text-sm text-[var(--dust-tint)]">Loading your current vote…</p>
-              : voteQuery.data
-                ? (
-                    <>
-                      <p className="mt-3 text-sm text-[var(--dust-tint)]">
-                        Voting power: {formatNumber(voteQuery.data.vp, 0)}
-                      </p>
-                      <ul className="mt-3 space-y-2 text-sm text-[var(--dust-tint)]" data-testid="wallet-vote-recap-list">
-                        {voteRecap.slice(0, 4).map(item => (
-                          <li key={item.label} className="flex items-start justify-between gap-3 rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/55 px-3 py-2">
-                            <span className="min-w-0 truncate">{item.label}</span>
-                            <span className="shrink-0 font-medium text-[var(--lime-cream)]">{item.weight.toFixed(2)}%</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )
-                : <p className="mt-3 text-sm text-[var(--dust-tint)]">No vote found yet for this wallet on the current proposal.</p>}
+            {hasInvalidWatchAddress
+              ? (
+                  <>
+                    <p className="mt-3 text-sm font-medium text-[var(--hot-fuchsia)]">Invalid watch address</p>
+                    <p className="mt-2 text-sm text-[var(--dust-tint)]">
+                      The <code className="rounded bg-[var(--gunmetal-mist)] px-1 py-0.5 text-xs">watch</code> query param is not a valid EVM address.
+                    </p>
+                  </>
+                )
+              : (
+                  <>
+                    <p className="mt-2 text-sm font-medium text-[var(--cloud-tint)]">{shortAddress(activeAddress)}</p>
+                    <p className="mt-2 text-sm text-[var(--dust-tint)]">
+                      {isWatchMode
+                        ? 'Read-only preview for the watched wallet, plus available incentive context and estimated rewards.'
+                        : 'Your allocation across voted gauges, plus available incentive context and estimated rewards.'}
+                    </p>
+
+                    {voteQuery.isPending
+                      ? <p className="mt-3 text-sm text-[var(--dust-tint)]">Loading current vote…</p>
+                      : voteQuery.data
+                        ? (
+                            <>
+                              <p className="mt-4 text-sm text-[var(--dust-tint)]">
+                                Voting power: {formatNumber(voteQuery.data.vp, 0)}
+                              </p>
+                              <ul className={`mt-4 ${hasWalletVote ? 'space-y-3.5' : 'space-y-3'} text-sm text-[var(--dust-tint)]`} data-testid="wallet-vote-recap-list">
+                                {walletVoteRecap.slice(0, 4).map(item => (
+                                  <li key={item.label} className={`rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/55 ${hasWalletVote ? 'px-3.5 py-3.5' : 'px-3 py-3'}`}>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-[15px] font-semibold text-[var(--cloud-tint)]">{item.label}</p>
+                                        <p className="mt-1 text-xs leading-5 text-[var(--fog-tint)]">
+                                          Your voting weight {formatNumber(item.estimatedVotes, 0)}
+                                          {item.bribeTokenSummary ? ` · Rewards: ${item.bribeTokenSummary}` : ' · Rewards: none detected'}
+                                        </p>
+                                      </div>
+                                      <span className="shrink-0 text-lg font-semibold text-[var(--lime-cream)]">{item.weight.toFixed(2)}%</span>
+                                    </div>
+
+                                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--slate-machine)]">
+                                      <div
+                                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--hyper-magenta),var(--pearl-aqua))]"
+                                        style={{ width: `${Math.min(item.weight, 100)}%` }}
+                                      />
+                                    </div>
+
+                                    <div className={`mt-3 grid gap-2 text-xs text-[var(--dust-tint)] ${hasWalletVote ? 'xl:grid-cols-2' : 'sm:grid-cols-2'}`}>
+                                      <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
+                                        <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Total bribes</p>
+                                        <p className="mt-1 text-lg font-semibold text-[var(--pearl-aqua)]">{formatCompactUsd(item.incentiveUsd)}</p>
+                                        <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.rewardRateLabel}</p>
+                                      </div>
+
+                                      <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
+                                        <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Your est. reward</p>
+                                        <p className="mt-1 text-lg font-semibold text-[var(--lime-cream)]">{formatCompactUsd(item.estimatedUsd)}</p>
+                                        <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.estimatedTokenSummary}</p>
+                                      </div>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+
+                              <p className="mt-3 text-xs text-[var(--fog-tint)]">
+                                Estimates assume rewards are distributed pro rata to final vote weight and may differ from final claimable amounts.
+                              </p>
+                            </>
+                          )
+                        : <p className="mt-3 text-sm text-[var(--dust-tint)]">No vote found yet for this wallet on the current proposal.</p>}
+                  </>
+                )}
           </aside>
         )}
       </section>
 
       <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-4" data-testid="vote-timetable-pill">
-        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.15fr_0.9fr]">
           <TimetableItem
             label="Current vote"
             value={epochQuery.data?.round ? `#${epochQuery.data.round}` : proposalQuery.isPending ? 'Loading…' : 'Unknown'}
@@ -146,12 +236,6 @@ export function HomeRoute() {
             value={proposal ? `${formatDateTimeCompact(proposal.start)} → ${formatDateTimeCompact(proposal.end)}` : '—'}
             detail={proposal ? `Shown in ${timeZone}` : 'Waiting for Snapshot data'}
             testId="current-vote-window"
-          />
-          <TimetableItem
-            label={voteWindow?.timerLabel ?? 'Time left'}
-            value={voteWindow?.timerValue ?? '—'}
-            detail={voteWindow?.timerDescription ?? 'Current vote timer unavailable'}
-            testId="current-vote-timer"
           />
           <TimetableItem
             label="Next vote"
@@ -199,6 +283,21 @@ function TimetableItem({ label, value, detail, testId }: { label: string, value:
   )
 }
 
+function CompactInfoChip({ label, value, tone }: { label: string, value: string, tone: 'aqua' | 'lime' | 'neutral' }) {
+  const toneClass = tone === 'aqua'
+    ? 'border-[var(--pearl-aqua)]/25 bg-[color:rgba(120,218,228,0.08)] text-[var(--pearl-aqua)]'
+    : tone === 'lime'
+        ? 'border-[var(--lime-cream)]/25 bg-[color:rgba(231,255,122,0.08)] text-[var(--lime-cream)]'
+        : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]/70 text-[var(--cloud-tint)]'
+
+  return (
+    <div className={`rounded-md border px-2.5 py-2 ${toneClass}`}>
+      <p className="uppercase tracking-[0.14em] text-[10px] text-[var(--fog-tint)]">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
+  )
+}
+
 function getVoteWindowState(start: number, end: number, now: number) {
   const nowSeconds = Math.floor(now / 1000)
 
@@ -242,7 +341,7 @@ function formatCountdown(countdown: ReturnType<typeof getCountdownParts>) {
 
 function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
   if (typeof vote.choice === 'number') {
-    return [{ label: proposal.choices[vote.choice - 1] ?? `Choice ${vote.choice}`, weight: 100.00 }]
+    return [{ choiceKey: String(vote.choice), label: proposal.choices[vote.choice - 1] ?? `Choice ${vote.choice}`, weight: 100.00 }]
   }
 
   const entries = Object.entries(vote.choice)
@@ -254,10 +353,77 @@ function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
 
   return entries
     .map(([choiceKey, weight]) => ({
+      choiceKey,
       label: proposal.choices[Number(choiceKey) - 1] ?? `Choice ${choiceKey}`,
       weight: Number(((weight / total) * 100).toFixed(2)),
     }))
     .sort((a, b) => b.weight - a.weight)
+}
+
+type WalletVoteRecapItem = {
+  label: string
+  weight: number
+  estimatedVotes: number
+  incentiveUsd?: number
+  estimatedUsd?: number
+  rewardRateLabel: string
+  bribeTokenSummary: string
+  estimatedTokenSummary: string
+}
+
+function getWalletVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal, poolRows: PoolRow[]): WalletVoteRecapItem[] {
+  const poolRowsByChoiceKey = new Map(poolRows.map(row => [row.choiceKey, row]))
+
+  return getVoteRecap(vote, proposal)
+    .map((item) => {
+      const poolRow = poolRowsByChoiceKey.get(item.choiceKey)
+      const estimatedVotes = vote.vp * (item.weight / 100)
+      const userShareOfGauge = poolRow?.snapshotVotes && poolRow.snapshotVotes > 0
+        ? estimatedVotes / poolRow.snapshotVotes
+        : undefined
+      const estimatedUsd = userShareOfGauge !== undefined && poolRow?.incentiveUsd !== undefined
+        ? poolRow.incentiveUsd * userShareOfGauge
+        : undefined
+      const estimatedTokens = userShareOfGauge !== undefined
+        ? (poolRow?.bribeTokens ?? []).map(token => ({
+            symbol: token.symbol,
+            amount: token.amount * userShareOfGauge,
+          }))
+        : []
+
+      return {
+        label: item.label,
+        weight: item.weight,
+        estimatedVotes,
+        incentiveUsd: poolRow?.incentiveUsd,
+        rewardRateLabel: poolRow?.rewardEfficiency !== undefined
+          ? `${formatCompactUsd(poolRow.rewardEfficiency, 2)}/vote at current totals`
+          : 'No incentive efficiency available',
+        bribeTokenSummary: poolRow?.bribeTokens.length
+          ? poolRow.bribeTokens.map(token => token.symbol).join(', ')
+          : '',
+        estimatedUsd,
+        estimatedTokenSummary: estimatedTokens.length
+          ? estimatedTokens
+              .slice(0, 3)
+              .map(token => `~${formatTokenAmount(token.amount)} ${token.symbol}`)
+              .join(' + ')
+          : 'No token estimate available',
+      }
+    })
+    .sort((a, b) => b.weight - a.weight)
+}
+
+function formatTokenAmount(value: number) {
+  if (value >= 100) {
+    return formatNumber(value, 0)
+  }
+
+  if (value >= 1) {
+    return formatNumber(value, 2)
+  }
+
+  return formatNumber(value, 4)
 }
 
 function shortAddress(address?: string) {

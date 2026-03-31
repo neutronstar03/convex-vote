@@ -1,10 +1,18 @@
 import type { LlamaEpoch } from './types'
 import type { PoolRow, SnapshotProposal } from '../proposal/types'
 
+function toSnapshotChoiceIndex(choice?: number) {
+  if (typeof choice !== 'number' || choice < 0) {
+    return undefined
+  }
+
+  return choice + 1
+}
+
 export function getBribedChoiceIndexes(epoch: LlamaEpoch | null) {
   return [...new Set(
     (epoch?.bribes ?? [])
-      .map(bribe => bribe.choice)
+      .map(bribe => toSnapshotChoiceIndex(bribe.choice))
       .filter((choice): choice is number => typeof choice === 'number' && choice > 0),
   )]
 }
@@ -25,20 +33,22 @@ export function mergeProposalAndEpoch(proposal: SnapshotProposal, epoch: LlamaEp
   const gaugeByChoice = new Map<number, string>()
 
   for (const bribe of epoch?.bribes ?? []) {
-    if (!bribe.choice)
+    const choiceIndex = toSnapshotChoiceIndex(bribe.choice)
+
+    if (!choiceIndex)
       continue
 
-    const tokens = bribesByChoice.get(bribe.choice) ?? []
+    const tokens = bribesByChoice.get(choiceIndex) ?? []
     tokens.push({
       symbol: bribe.token,
       amount: bribe.amount,
       amountUsd: bribe.amountDollars,
     })
-    bribesByChoice.set(bribe.choice, tokens)
-    incentiveUsdByChoice.set(bribe.choice, (incentiveUsdByChoice.get(bribe.choice) ?? 0) + bribe.amountDollars)
+    bribesByChoice.set(choiceIndex, tokens)
+    incentiveUsdByChoice.set(choiceIndex, (incentiveUsdByChoice.get(choiceIndex) ?? 0) + bribe.amountDollars)
 
     if (bribe.gauge) {
-      gaugeByChoice.set(bribe.choice, bribe.gauge)
+      gaugeByChoice.set(choiceIndex, bribe.gauge)
     }
   }
 

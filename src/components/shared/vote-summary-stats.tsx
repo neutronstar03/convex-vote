@@ -1,15 +1,12 @@
-import { formatCompactNumber, formatCompactUsd, formatDateCompact, formatDateTimeCompact } from '../../lib/format'
+import { formatCompactNumber, formatCompactUsd } from '../../lib/format'
 
 type VoteSummaryStatsProps = {
   roundNumber?: number | null
   totalVotes: number
   totalIncentivesUsd?: number
-  start?: number
-  deadline: number
-  countdown: string
 }
 
-export function VoteSummaryStats({ roundNumber, totalVotes, totalIncentivesUsd, start, deadline, countdown }: VoteSummaryStatsProps) {
+export function VoteSummaryStats({ roundNumber, totalVotes, totalIncentivesUsd }: VoteSummaryStatsProps) {
   const dollarsPerVote = totalIncentivesUsd !== undefined && totalVotes > 0
     ? totalIncentivesUsd / totalVotes
     : undefined
@@ -43,17 +40,10 @@ export function VoteSummaryStats({ roundNumber, totalVotes, totalIncentivesUsd, 
       trailing: '',
       testId: 'summary-reward-rate',
     },
-    {
-      label: 'Deadline',
-      value: formatDateTimeCompact(deadline),
-      detail: start ? `Starts ${formatDateTimeCompact(start)} · ${countdown}` : countdown,
-      trailing: '',
-      testId: 'summary-deadline',
-    },
   ]
 
   return (
-    <section className="grid gap-3 md:grid-cols-5" data-testid="vote-summary-stats">
+    <section className="grid gap-3 md:grid-cols-4" data-testid="vote-summary-stats">
       {items.map(item => (
         <article
           key={item.label}
