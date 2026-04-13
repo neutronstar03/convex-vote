@@ -1,4 +1,4 @@
-export type SnapshotProposal = {
+export interface SnapshotProposal {
   id: string
   title: string
   state: string
@@ -9,18 +9,18 @@ export type SnapshotProposal = {
   scores_total: number
 }
 
-export type SnapshotProposalResponse = {
+export interface SnapshotProposalResponse {
   proposals: SnapshotProposal[]
 }
 
-export type SnapshotVote = {
+export interface SnapshotVote {
   voter: string
   choice: number | Record<string, number>
   vp: number
   created: number
 }
 
-export type PoolRow = {
+export interface PoolRow {
   choiceIndex: number
   choiceKey: string
   label: string

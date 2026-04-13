@@ -1,10 +1,10 @@
-import '@rainbow-me/rainbowkit/styles.css'
+import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import { RouterProvider } from 'react-router/dom'
 import { WagmiProvider } from 'wagmi'
-import { router } from './router'
 import { wagmiConfig } from '../features/wallet/wagmi'
+import { router } from './router'
+import '@rainbow-me/rainbowkit/styles.css'
 
 const queryClient = new QueryClient()
 

@@ -1,8 +1,20 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { Link } from 'react-router'
 import type { PropsWithChildren } from 'react'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router'
+import { initClickTracking, trackPageview } from '../../lib/analytics'
 
 export function AppShell({ children }: PropsWithChildren) {
+  const location = useLocation()
+
+  useEffect(() => {
+    trackPageview(location.pathname + location.search)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    initClickTracking()
+  }, [])
+
   return (
     <div className="min-h-screen bg-[var(--ash-graphite)] text-[var(--cloud-tint)]" data-testid="app-shell">
       <header className="border-b border-[var(--steel-haze)] bg-[var(--slate-machine)]/95 backdrop-blur" data-testid="navbar">

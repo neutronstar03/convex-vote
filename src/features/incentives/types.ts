@@ -1,8 +1,8 @@
-export type LlamaRoundSummary = {
+export interface LlamaRoundSummary {
   rounds: number[]
 }
 
-export type LlamaBribe = {
+export interface LlamaBribe {
   pool: string
   token: string
   gauge?: string
@@ -11,7 +11,7 @@ export type LlamaBribe = {
   amountDollars: number
 }
 
-export type LlamaEpoch = {
+export interface LlamaEpoch {
   id: string
   round: number
   proposal: string
@@ -21,6 +21,6 @@ export type LlamaEpoch = {
   bribes: LlamaBribe[]
 }
 
-export type LlamaEpochResponse = {
+export interface LlamaEpochResponse {
   epoch: LlamaEpoch
 }

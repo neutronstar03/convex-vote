@@ -1,9 +1,10 @@
 import type { LlamaEpoch, LlamaEpochResponse, LlamaRoundSummary } from './types'
 
+// Always use the same-origin proxy path. In dev the Vite proxy rewrites
+// /api/llama → https://api.llama.airforce; in production the CF Pages
+// Function at /api/llama/[[path]] handles forwarding.
 const LLAMA_BASE_URL = import.meta.env.VITE_LLAMA_API_BASE_URL
-  ?? (import.meta.env.DEV
-    ? '/api/llama/bribes/votium/cvx-crv'
-    : 'https://api.llama.airforce/bribes/votium/cvx-crv')
+  ?? '/api/llama/bribes/votium/cvx-crv'
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
@@ -29,7 +30,7 @@ export async function fetchLatestEpoch() {
   const latestRound = Math.max(...rounds.rounds)
 
   if (!Number.isFinite(latestRound)) {
-    throw new Error('No Llama rounds found')
+    throw new TypeError('No Llama rounds found')
   }
 
   return fetchEpoch(latestRound)

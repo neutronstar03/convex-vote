@@ -1,5 +1,5 @@
-import type { LlamaEpoch } from './types'
 import type { PoolRow, SnapshotProposal } from '../proposal/types'
+import type { LlamaEpoch } from './types'
 
 function toSnapshotChoiceIndex(choice?: number) {
   if (typeof choice !== 'number' || choice < 0) {

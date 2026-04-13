@@ -1,3 +1,4 @@
+import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { isAddress } from 'viem'
@@ -7,7 +8,6 @@ import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
 import { useEpochForProposal } from '../features/incentives/queries'
 import { mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useResolvedProposal, useUserVote } from '../features/proposal/queries'
-import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
 import { formatCompactUsd, formatDateCompact, formatDateTime, formatNumber, formatPercent, getCurrentTimeZone } from '../lib/format'
 
 type SortKey = 'incentives' | 'efficiency' | 'votes' | 'voteShare'
@@ -106,7 +106,9 @@ export function ProposalRoute() {
     return (
       <AppShell>
         <section className="rounded-lg border border-[var(--hot-fuchsia)]/40 bg-[color:rgba(255,22,84,0.1)] p-8 text-[var(--cloud-tint)]">
-          Failed to load proposal: {proposalQuery.error.message}
+          Failed to load proposal:
+          {' '}
+          {proposalQuery.error.message}
         </section>
       </AppShell>
     )
@@ -116,15 +118,16 @@ export function ProposalRoute() {
   const statusLabel = resolvedProposal.state.toLowerCase() === 'closed'
     ? `Ended ${formatDateTime(resolvedProposal.end)}`
     : resolvedProposal.state.toLowerCase() === 'active'
-        ? `Ends ${formatDateTime(resolvedProposal.end)}`
-        : resolvedProposal.state
+      ? `Ends ${formatDateTime(resolvedProposal.end)}`
+      : resolvedProposal.state
 
   const handleCopy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value)
       setCopiedLabel(label)
       window.setTimeout(() => setCopiedLabel(current => current === label ? null : current), 1500)
-    } catch {
+    }
+    catch {
       setCopiedLabel(`Failed: ${label}`)
       window.setTimeout(() => setCopiedLabel(current => current === `Failed: ${label}` ? null : current), 1500)
     }
@@ -142,7 +145,16 @@ export function ProposalRoute() {
         <article className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-6">
           <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Proposal overview</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--cloud-tint)]">{resolvedProposal.title}</h1>
-          <p className="mt-2 text-sm text-[var(--dust-tint)]">Window {formatDateCompact(resolvedProposal.start)} → {formatDateCompact(resolvedProposal.end)} · {timeZone}</p>
+          <p className="mt-2 text-sm text-[var(--dust-tint)]">
+            Window
+            {formatDateCompact(resolvedProposal.start)}
+            {' '}
+            →
+            {formatDateCompact(resolvedProposal.end)}
+            {' '}
+            ·
+            {timeZone}
+          </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Status" value={capitalize(resolvedProposal.state)} detail={statusLabel} tone="neutral" />
@@ -207,7 +219,12 @@ export function ProposalRoute() {
               <h2 className="mt-2 text-2xl font-semibold text-[var(--cloud-tint)]">Wallet-voted gauges</h2>
             </div>
             {voteQuery.data
-              ? <p className="text-sm text-[var(--fog-tint)]">Voting power {formatNumber(voteQuery.data.vp, 0)}</p>
+              ? (
+                  <p className="text-sm text-[var(--fog-tint)]">
+                    Voting power
+                    {formatNumber(voteQuery.data.vp, 0)}
+                  </p>
+                )
               : null}
           </div>
 
@@ -221,9 +238,15 @@ export function ProposalRoute() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-base font-semibold text-[var(--cloud-tint)]">{recap.label}</p>
-                            <p className="mt-1 text-xs text-[var(--fog-tint)]">Your voting weight {formatNumber(recap.estimatedVotes, 0)}</p>
+                            <p className="mt-1 text-xs text-[var(--fog-tint)]">
+                              Your voting weight
+                              {formatNumber(recap.estimatedVotes, 0)}
+                            </p>
                           </div>
-                          <span className="text-lg font-semibold text-[var(--lime-cream)]">{recap.weight.toFixed(2)}%</span>
+                          <span className="text-lg font-semibold text-[var(--lime-cream)]">
+                            {recap.weight.toFixed(2)}
+                            %
+                          </span>
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -252,7 +275,15 @@ export function ProposalRoute() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-[var(--fog-tint)]">Showing {sortedRows.length} of {bribedRows.length} bribed gauges.</p>
+            <p className="text-sm text-[var(--fog-tint)]">
+              Showing
+              {sortedRows.length}
+              {' '}
+              of
+              {bribedRows.length}
+              {' '}
+              bribed gauges.
+            </p>
             <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
               Search
               <input
@@ -309,7 +340,7 @@ export function ProposalRoute() {
                 </div>
               )
             : null}
-          {sortedRows.map(row => {
+          {sortedRows.map((row) => {
             const isWalletRow = walletChoiceKeys.has(row.choiceKey)
 
             return (
@@ -325,7 +356,11 @@ export function ProposalRoute() {
                         ? <span className="rounded-md border border-[var(--hyper-magenta)]/40 bg-[color:rgba(171,58,255,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--lime-cream)]">Your vote</span>
                         : null}
                     </div>
-                    <p className="mt-1 text-xs text-[var(--fog-tint)]">Choice #{row.choiceIndex}{row.gaugeAddress ? ` · Gauge ${shortAddress(row.gaugeAddress)}` : ''}</p>
+                    <p className="mt-1 text-xs text-[var(--fog-tint)]">
+                      Choice #
+                      {row.choiceIndex}
+                      {row.gaugeAddress ? ` · Gauge ${shortAddress(row.gaugeAddress)}` : ''}
+                    </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {row.bribeTokens.length > 0
                         ? row.bribeTokens.map(token => (
@@ -394,8 +429,8 @@ function MetricCard({
   const valueClass = tone === 'aqua'
     ? 'text-[var(--pearl-aqua)]'
     : tone === 'lime'
-        ? 'text-[var(--lime-cream)]'
-        : 'text-[var(--cloud-tint)]'
+      ? 'text-[var(--lime-cream)]'
+      : 'text-[var(--cloud-tint)]'
 
   return (
     <div className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] p-4">
@@ -421,8 +456,8 @@ function CompactInfoChip({ label, value, tone }: { label: string, value: string,
   const toneClass = tone === 'aqua'
     ? 'border-[var(--pearl-aqua)]/25 bg-[color:rgba(120,218,228,0.08)] text-[var(--pearl-aqua)]'
     : tone === 'lime'
-        ? 'border-[var(--lime-cream)]/25 bg-[color:rgba(231,255,122,0.08)] text-[var(--lime-cream)]'
-        : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]/70 text-[var(--cloud-tint)]'
+      ? 'border-[var(--lime-cream)]/25 bg-[color:rgba(231,255,122,0.08)] text-[var(--lime-cream)]'
+      : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]/70 text-[var(--cloud-tint)]'
 
   return (
     <div className={`rounded-md border px-2.5 py-2 ${toneClass}`}>
@@ -445,8 +480,8 @@ function DataPill({ label, value, tone }: { label: string, value: string, tone: 
   const valueClass = tone === 'aqua'
     ? 'text-[var(--pearl-aqua)]'
     : tone === 'lime'
-        ? 'text-[var(--lime-cream)]'
-        : 'text-[var(--cloud-tint)]'
+      ? 'text-[var(--lime-cream)]'
+      : 'text-[var(--cloud-tint)]'
 
   return (
     <div className="rounded-md border border-[var(--steel-haze)]/60 bg-[var(--gunmetal-mist)]/45 px-3 py-2">
@@ -491,7 +526,7 @@ function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
     .sort((a, b) => b.weight - a.weight)
 }
 
-type WalletVoteRecapItem = {
+interface WalletVoteRecapItem {
   choiceKey: string
   label: string
   weight: number

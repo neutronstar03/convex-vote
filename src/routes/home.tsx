@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
 import { ArrowRight, ExternalLink } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
@@ -9,7 +10,6 @@ import { useEpochForProposal } from '../features/incentives/queries'
 import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useRecentGaugeProposals, useResolvedProposal, useUserVote } from '../features/proposal/queries'
 import { getCountdownParts, getEstimatedNextVoteStart } from '../features/proposal/utils'
-import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
 import { formatCompactUsd, formatDateCompact, formatDateTimeCompact, formatDateTimeMs, formatNumber, getCurrentTimeZone } from '../lib/format'
 
 export function HomeRoute() {
@@ -59,8 +59,8 @@ export function HomeRoute() {
   const urgencyClass = voteWindow?.status === 'open' && voteWindow.totalHoursLeft !== undefined && voteWindow.totalHoursLeft < 6
     ? 'border-[var(--hot-fuchsia)]/50 bg-[color:rgba(255,22,84,0.12)] text-[var(--hot-fuchsia)]'
     : voteWindow?.status === 'open'
-        ? 'border-[var(--pearl-aqua)]/50 bg-[color:rgba(120,218,228,0.12)] text-[var(--pearl-aqua)]'
-        : 'border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/40 text-[var(--dust-tint)]'
+      ? 'border-[var(--pearl-aqua)]/50 bg-[color:rgba(120,218,228,0.12)] text-[var(--pearl-aqua)]'
+      : 'border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/40 text-[var(--dust-tint)]'
 
   return (
     <AppShell>
@@ -98,7 +98,13 @@ export function HomeRoute() {
                   {proposal?.title ?? 'Loading current Convex vote…'}
                 </h1>
                 <p className="mt-2 text-sm text-[var(--dust-tint)]" data-testid="home-local-time">
-                  Local time {formatDateTimeMs(now)} · {timeZone}
+                  Local time
+                  {' '}
+                  {formatDateTimeMs(now)}
+                  {' '}
+                  ·
+                  {' '}
+                  {timeZone}
                 </p>
                 {hasWalletVote
                   ? (
@@ -152,7 +158,11 @@ export function HomeRoute() {
                   <>
                     <p className="mt-3 text-sm font-medium text-[var(--hot-fuchsia)]">Invalid watch address</p>
                     <p className="mt-2 text-sm text-[var(--dust-tint)]">
-                      The <code className="rounded bg-[var(--gunmetal-mist)] px-1 py-0.5 text-xs">watch</code> query param is not a valid EVM address.
+                      The
+                      {' '}
+                      <code className="rounded bg-[var(--gunmetal-mist)] px-1 py-0.5 text-xs">watch</code>
+                      {' '}
+                      query param is not a valid EVM address.
                     </p>
                   </>
                 )
@@ -171,7 +181,9 @@ export function HomeRoute() {
                         ? (
                             <>
                               <p className="mt-4 text-sm text-[var(--dust-tint)]">
-                                Voting power: {formatNumber(voteQuery.data.vp, 0)}
+                                Voting power:
+                                {' '}
+                                {formatNumber(voteQuery.data.vp, 0)}
                               </p>
                               <ul className={`mt-4 ${hasWalletVote ? 'space-y-3.5' : 'space-y-3'} text-sm text-[var(--dust-tint)]`} data-testid="wallet-vote-recap-list">
                                 {walletVoteRecap.slice(0, 4).map(item => (
@@ -180,11 +192,16 @@ export function HomeRoute() {
                                       <div className="min-w-0">
                                         <p className="truncate text-[15px] font-semibold text-[var(--cloud-tint)]">{item.label}</p>
                                         <p className="mt-1 text-xs leading-5 text-[var(--fog-tint)]">
-                                          Your voting weight {formatNumber(item.estimatedVotes, 0)}
+                                          Your voting weight
+                                          {' '}
+                                          {formatNumber(item.estimatedVotes, 0)}
                                           {item.bribeTokenSummary ? ` · Rewards: ${item.bribeTokenSummary}` : ' · Rewards: none detected'}
                                         </p>
                                       </div>
-                                      <span className="shrink-0 text-lg font-semibold text-[var(--lime-cream)]">{item.weight.toFixed(2)}%</span>
+                                      <span className="shrink-0 text-lg font-semibold text-[var(--lime-cream)]">
+                                        {item.weight.toFixed(2)}
+                                        %
+                                      </span>
                                     </div>
 
                                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--slate-machine)]">
@@ -287,8 +304,8 @@ function CompactInfoChip({ label, value, tone }: { label: string, value: string,
   const toneClass = tone === 'aqua'
     ? 'border-[var(--pearl-aqua)]/25 bg-[color:rgba(120,218,228,0.08)] text-[var(--pearl-aqua)]'
     : tone === 'lime'
-        ? 'border-[var(--lime-cream)]/25 bg-[color:rgba(231,255,122,0.08)] text-[var(--lime-cream)]'
-        : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]/70 text-[var(--cloud-tint)]'
+      ? 'border-[var(--lime-cream)]/25 bg-[color:rgba(231,255,122,0.08)] text-[var(--lime-cream)]'
+      : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]/70 text-[var(--cloud-tint)]'
 
   return (
     <div className={`rounded-md border px-2.5 py-2 ${toneClass}`}>
@@ -360,7 +377,7 @@ function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
     .sort((a, b) => b.weight - a.weight)
 }
 
-type WalletVoteRecapItem = {
+interface WalletVoteRecapItem {
   label: string
   weight: number
   estimatedVotes: number

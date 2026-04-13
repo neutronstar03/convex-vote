@@ -1,6 +1,6 @@
 import { formatCompactNumber, formatCompactUsd } from '../../lib/format'
 
-type VoteSummaryStatsProps = {
+interface VoteSummaryStatsProps {
   roundNumber?: number | null
   totalVotes: number
   totalIncentivesUsd?: number

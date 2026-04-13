@@ -1,0 +1,9 @@
+name = "convex-vote"
+compatibility_date = "2025-04-13"
+pages_build_output_dir = "./build/client"
+
+[placement]
+mode = "smart"
+
+# Secrets (set via Cloudflare dashboard or wrangler CLI):
+#   wrangler pages secret put UMAMI_BACKEND_URL

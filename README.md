@@ -4,6 +4,12 @@
 
 Convex gauge voting is too important to be hidden behind awkward workflows and hard-to-read data. This project aims to give CVX voters a cleaner interface, better market context, and a wallet-aware view of rewards so everybody can vote with a good UI.
 
+## Recent updates
+
+- v0.1.0: first public release
+- deployed on Cloudflare Pages at `https://cvx.ns03.dev`
+- added same-origin Llama proxying and first-party Umami analytics support
+
 ## What it does
 
 - shows the latest Convex gauge round in a readable dashboard
@@ -36,12 +42,9 @@ The current product direction is:
 
 ## Status
 
-The app is working locally and deployment is coming **soon**.
+The app is live at **https://cvx.ns03.dev**.
 
-It is **not live yet** because a few production pieces are still missing, mainly:
-
-- a proper domain
-- backend/proxy support for public API access
+Production deploys run on Cloudflare Pages with same-origin proxying for Llama Airforce data and first-party analytics forwarding for Umami.
 
 ## Local development
 

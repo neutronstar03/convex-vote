@@ -1,7 +1,7 @@
-import { APP_NAME } from '../../lib/constants'
-import { coinbaseWallet, injected, metaMask } from 'wagmi/connectors'
 import { createConfig, http } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
+import { coinbaseWallet, injected, metaMask } from 'wagmi/connectors'
+import { APP_NAME } from '../../lib/constants'
 
 export const wagmiConfig = createConfig({
   chains: [mainnet],
@@ -10,7 +10,7 @@ export const wagmiConfig = createConfig({
     metaMask({
       dappMetadata: {
         name: APP_NAME,
-        url: 'http://localhost:5173',
+        url: 'https://cvx.ns03.dev',
       },
     }),
     coinbaseWallet({
