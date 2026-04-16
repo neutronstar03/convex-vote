@@ -1,4 +1,5 @@
-import { getAddress } from 'viem'
+/// <reference types="@cloudflare/workers-types" />
+
 import { findClaimsForVoter, serializeClaimableToken } from '../../../../src/features/claim/source'
 
 function jsonResponse(body: unknown, status = 200) {
@@ -22,16 +23,17 @@ export const onRequestGet: PagesFunction = async (context) => {
       return jsonResponse({ error: 'Missing wallet address' }, 400)
     }
 
-    const address = getAddress(rawAddress)
-    const claims = await findClaimsForVoter(fetch, address)
+    // Address validation is handled inside findClaimsForVoter
+    const claims = await findClaimsForVoter(fetch, rawAddress)
 
     return jsonResponse({
-      address,
+      address: rawAddress.toLowerCase(),
       claims: claims.map(serializeClaimableToken),
     })
   }
   catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Votium claims error:', error)
     return jsonResponse({ error: `Votium claim proxy error: ${message}` }, 502)
   }
 }

@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __GIT_SHA__: string
+
 interface Window {
   ethereum?: {
     isMetaMask?: boolean

@@ -6,6 +6,8 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.2: fixed 502 error on claims by bypassing Worker subrequest limits
+- v1.0.1: added footer with version info and fixed TypeScript errors
 - v1.0.0: added Votium bribe claiming and in-app Snapshot voting
 - v0.1.0: first public release
 - deployed on Cloudflare Pages at `https://cvx.ns03.dev`

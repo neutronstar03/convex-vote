@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.2 - 2026-04-17
+
+- fixed 502 Bad Gateway on Votium claims by fetching directly from Firebase/GitHub
+- removed Worker proxy to avoid Cloudflare's 50 subrequest limit
+
+## v1.0.1 - 2026-04-17
+
+- added footer component with version, git SHA, and external links
+- fixed TypeScript type errors in Votium claims Cloudflare Function
+- added @types/node for proper Node.js API type checking
+- added repository and author fields to package.json
+
 ## v1.0.0 - 2026-04-17
 
 - added Votium bribe claiming for the last 5 completed rounds via /claims page

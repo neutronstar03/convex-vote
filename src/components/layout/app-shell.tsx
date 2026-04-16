@@ -3,6 +3,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router'
 import { initClickTracking, trackPageview } from '../../lib/analytics'
+import { Footer } from './footer'
 
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation()
@@ -16,7 +17,7 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[var(--ash-graphite)] text-[var(--cloud-tint)]" data-testid="app-shell">
+    <div className="flex min-h-screen flex-col bg-[var(--ash-graphite)] text-[var(--cloud-tint)]" data-testid="app-shell">
       <header className="border-b border-[var(--steel-haze)] bg-[var(--slate-machine)]/95 backdrop-blur" data-testid="navbar">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div data-testid="navbar-brand">
@@ -43,9 +44,11 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-5" data-testid="app-main">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-5 py-5" data-testid="app-main">
         {children}
       </main>
+
+      <Footer />
     </div>
   )
 }

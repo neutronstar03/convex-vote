@@ -1,10 +1,15 @@
 import type { ActiveToken, ClaimableToken, ClaimableTokenPayload, FirebaseClaimEntry } from './types'
-import { getAddress } from 'viem'
 
 export const VOTIUM_FIREBASE_DATABASE_URL = 'https://test-54f45-default-rtdb.firebaseio.com' as const
 export const VOTIUM_GITHUB_RAW = 'https://raw.githubusercontent.com/oo-00/Votium/main/merkle' as const
 
 type FetchLike = typeof fetch
+
+function getAddressCandidates(address: string): `0x${string}`[] {
+  const trimmed = address.trim()
+  const candidates = [trimmed, trimmed.toLowerCase()]
+  return [...new Set(candidates)] as `0x${string}`[]
+}
 
 async function fetchJson<T>(fetcher: FetchLike, url: string): Promise<T> {
   const response = await fetcher(url, {
@@ -71,17 +76,19 @@ export function deserializeClaimableToken(claim: ClaimableTokenPayload): Claimab
 export async function fetchFirebaseClaimForToken(
   fetcher: FetchLike,
   token: ActiveToken,
-  address: `0x${string}`,
+  addresses: `0x${string}`[],
 ): Promise<ClaimableToken | null> {
   const tokenKey = token.value.toUpperCase()
-  const url = `${VOTIUM_FIREBASE_DATABASE_URL}/claims/${tokenKey}/claims/${encodeURIComponent(address)}.json`
-  const claimEntry = await fetchJson<FirebaseClaimEntry | null>(fetcher, url)
+  for (const address of addresses) {
+    const url = `${VOTIUM_FIREBASE_DATABASE_URL}/claims/${tokenKey}/claims/${encodeURIComponent(address)}.json`
+    const claimEntry = await fetchJson<FirebaseClaimEntry | null>(fetcher, url)
 
-  if (!claimEntry) {
-    return null
+    if (claimEntry) {
+      return toClaimableToken(token, claimEntry)
+    }
   }
 
-  return toClaimableToken(token, claimEntry)
+  return null
 }
 
 export async function findClaimsForVoter(
@@ -89,10 +96,10 @@ export async function findClaimsForVoter(
   voterAddress: string,
   activeTokens?: ActiveToken[],
 ): Promise<ClaimableToken[]> {
-  const address = getAddress(voterAddress)
+  const addresses = getAddressCandidates(voterAddress)
   const tokens = activeTokens ?? await fetchActiveTokens(fetcher)
 
-  const claims = await Promise.all(tokens.map(token => fetchFirebaseClaimForToken(fetcher, token, address)))
+  const claims = await Promise.all(tokens.map(token => fetchFirebaseClaimForToken(fetcher, token, addresses)))
 
   return claims
     .filter((claim): claim is ClaimableToken => claim !== null)
