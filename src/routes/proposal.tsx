@@ -8,6 +8,9 @@ import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
 import { useEpochForProposal } from '../features/incentives/queries'
 import { mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useResolvedProposal, useUserVote } from '../features/proposal/queries'
+import { AllocationEditor } from '../features/voting/allocation-editor'
+import { ReviewModal } from '../features/voting/review-modal'
+import { useSubmitVote } from '../features/voting/use-submit-vote'
 import { formatCompactUsd, formatDateCompact, formatDateTime, formatNumber, formatPercent, getCurrentTimeZone } from '../lib/format'
 
 type SortKey = 'incentives' | 'efficiency' | 'votes' | 'voteShare'
@@ -28,6 +31,10 @@ export function ProposalRoute() {
   const [rewardTokenFilter, setRewardTokenFilter] = useState('all')
   const [showOnlyWalletVotes, setShowOnlyWalletVotes] = useState(false)
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null)
+  const [showVoteEditor, setShowVoteEditor] = useState(false)
+  const [reviewAllocations, setReviewAllocations] = useState<Record<string, number> | null>(null)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const submitVoteMutation = useSubmitVote()
   const proposalQuery = useResolvedProposal(proposalId)
   const epochQuery = useEpochForProposal(proposalQuery.data?.id)
   const watchParam = searchParams.get('watch')?.trim()
@@ -264,6 +271,119 @@ export function ProposalRoute() {
                   </div>
                 )
               : <p className="mt-4 text-sm text-[var(--dust-tint)]">No wallet vote found for this proposal.</p>}
+        </section>
+      )}
+
+      {/* Voting section */}
+      {activeAddress && proposal && proposal.state.toLowerCase() === 'active' && (
+        <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Cast your vote</p>
+              <h2 className="mt-2 text-2xl font-semibold text-[var(--cloud-tint)]">
+                {voteQuery.data ? 'Update your vote' : 'Vote on this proposal'}
+              </h2>
+            </div>
+            {!showVoteEditor && (
+              <button
+                type="button"
+                onClick={() => setShowVoteEditor(true)}
+                className="rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
+              >
+                {voteQuery.data ? 'Edit vote' : 'Start voting'}
+              </button>
+            )}
+          </div>
+
+          {voteQuery.data && !showVoteEditor && (
+            <p className="mt-3 text-sm text-[var(--dust-tint)]">
+              You have already voted on this proposal. You can update your vote at any time before the proposal closes.
+            </p>
+          )}
+
+          {showVoteEditor && (
+            <div className="mt-4">
+              <AllocationEditor
+                choices={proposal.choices}
+                isConnected={Boolean(address)}
+                proposalActive={proposal.state.toLowerCase() === 'active'}
+                votingPower={voteQuery.data?.vp}
+                existingAllocations={voteQuery.data && typeof voteQuery.data.choice === 'object' ? voteQuery.data.choice as Record<string, number> : undefined}
+                onSubmit={(allocations) => {
+                  setReviewAllocations(allocations)
+                  setIsReviewOpen(true)
+                }}
+                isSubmitting={submitVoteMutation.isPending}
+              />
+              <button
+                type="button"
+                onClick={() => setShowVoteEditor(false)}
+                className="mt-3 text-sm text-[var(--fog-tint)] hover:text-[var(--cloud-tint)]"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {submitVoteMutation.isSuccess && (
+            <div className="mt-4 rounded-md border border-[var(--lime-cream)]/35 bg-[color:rgba(231,255,122,0.08)] p-4">
+              <p className="font-semibold text-[var(--lime-cream)]">Vote submitted successfully!</p>
+              <p className="mt-1 text-sm text-[var(--dust-tint)]">
+                Your vote has been recorded on Snapshot.
+                {submitVoteMutation.data?.id && (
+                  <>
+                    {' '}
+                    Receipt:
+                    {' '}
+                    <a
+                      href={`https://snapshot.box/#/cvx.eth/proposal/${proposal.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--pearl-aqua)] underline hover:no-underline"
+                    >
+                      {submitVoteMutation.data.id.slice(0, 10)}
+                      ...
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
+          <ReviewModal
+            allocations={reviewAllocations ?? {}}
+            choiceNames={proposal.choices}
+            total={reviewAllocations ? Object.values(reviewAllocations).reduce((s, v) => s + v, 0) : 0}
+            isRevote={Boolean(voteQuery.data)}
+            isOpen={isReviewOpen}
+            isSubmitting={submitVoteMutation.isPending}
+            error={submitVoteMutation.error?.message ?? null}
+            onConfirm={() => {
+              if (!reviewAllocations || !address || !proposal)
+                return
+              submitVoteMutation.mutate(
+                {
+                  proposalId: proposal.id,
+                  allocations: reviewAllocations,
+                  account: address,
+                },
+                {
+                  onSuccess: () => {
+                    setIsReviewOpen(false)
+                    setReviewAllocations(null)
+                  },
+                  onError: () => {
+                    // Keep modal open for retry
+                  },
+                },
+              )
+            }}
+            onCancel={() => {
+              setIsReviewOpen(false)
+              setReviewAllocations(null)
+            }}
+            setModalOpen={setIsReviewOpen}
+          />
         </section>
       )}
 

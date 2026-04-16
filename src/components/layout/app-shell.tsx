@@ -28,6 +28,15 @@ export function AppShell({ children }: PropsWithChildren) {
             </p>
           </div>
 
+          <nav className="flex items-center gap-5">
+            <Link to="/" className="text-sm text-[var(--dust-tint)] transition hover:text-[var(--cloud-tint)]">
+              Dashboard
+            </Link>
+            <Link to="/claims" className="text-sm text-[var(--dust-tint)] transition hover:text-[var(--cloud-tint)]">
+              Claims
+            </Link>
+          </nav>
+
           <div data-testid="rainbowkit-connect-button">
             <ConnectButton showBalance={false} chainStatus="icon" />
           </div>

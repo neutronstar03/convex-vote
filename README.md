@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.0: added Votium bribe claiming and in-app Snapshot voting
 - v0.1.0: first public release
 - deployed on Cloudflare Pages at `https://cvx.ns03.dev`
 - added same-origin Llama proxying and first-party Umami analytics support
