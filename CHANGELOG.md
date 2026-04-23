@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.3 - 2026-04-23
+
+- enabled WalletConnect-powered RainbowKit mobile wallet connections
+- switched wallet config to RainbowKit's default setup for more reliable mobile support
+
 ## v1.0.2 - 2026-04-17
 
 - fixed 502 Bad Gateway on Votium claims by fetching directly from Firebase/GitHub

@@ -1,22 +1,12 @@
-import { createConfig, fallback, http } from 'wagmi'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { fallback, http } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { coinbaseWallet, injected, metaMask } from 'wagmi/connectors'
 import { APP_NAME } from '../../lib/constants'
 
-export const wagmiConfig = createConfig({
+export const wagmiConfig = getDefaultConfig({
+  appName: APP_NAME,
+  projectId: 'd4fc2fe4cb25810595477364f2c0d3bf',
   chains: [mainnet],
-  connectors: [
-    injected(),
-    metaMask({
-      dappMetadata: {
-        name: APP_NAME,
-        url: 'https://cvx.ns03.dev',
-      },
-    }),
-    coinbaseWallet({
-      appName: APP_NAME,
-    }),
-  ],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
