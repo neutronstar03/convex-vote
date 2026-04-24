@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.4 - 2026-04-25
+
+- rolled wagmi back to a RainbowKit-compatible v2 release to restore reliable Rabby mobile connections
+- updated the wallet transport import path to match the wagmi v2 stack again
+
 ## v1.0.3 - 2026-04-23
 
 - enabled WalletConnect-powered RainbowKit mobile wallet connections

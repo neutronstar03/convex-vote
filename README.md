@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.4: rolled wagmi back to the RainbowKit-compatible v2 stack for more reliable Rabby mobile connections
 - v1.0.3: enabled WalletConnect mobile wallet connections via RainbowKit default config
 - v1.0.2: fixed 502 error on claims by bypassing Worker subrequest limits
 - v1.0.1: added footer with version info and fixed TypeScript errors

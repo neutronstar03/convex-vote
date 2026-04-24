@@ -1,5 +1,5 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
-import { fallback, http } from 'wagmi'
+import { fallback, http } from 'viem'
 import { mainnet } from 'wagmi/chains'
 import { APP_NAME } from '../../lib/constants'
 
