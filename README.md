@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.6: added active-round bribe anomaly warnings against the previous Llama round
 - v1.0.5: improved proposal polish, watched-wallet validation, and claim readiness handling
 - v1.0.4: rolled wagmi back to the RainbowKit-compatible v2 stack for more reliable Rabby mobile connections
 - v1.0.3: enabled WalletConnect mobile wallet connections via RainbowKit default config

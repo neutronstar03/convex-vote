@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.6 - 2026-06-07
+
+- added active-round bribe anomaly detection against the previous Llama round
+- added warning icons and severe-data callouts when current bribe data is far below the previous round
+- kept current live bribe metrics visible while clarifying that active Votium/Llama data may still update
+
 ## v1.0.5 - 2026-06-07
 
 - improved proposal page copy spacing and watched-wallet validation feedback

@@ -1,12 +1,13 @@
 import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
+import { AlertTriangle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
-import { useEpochForProposal } from '../features/incentives/queries'
-import { mergeProposalAndEpoch } from '../features/incentives/utils'
+import { useEpochForProposal, usePreviousEpoch } from '../features/incentives/queries'
+import { getBribeDataAnomaly, mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useResolvedProposal, useUserVote } from '../features/proposal/queries'
 import { AllocationEditor } from '../features/voting/allocation-editor'
 import { ReviewModal } from '../features/voting/review-modal'
@@ -37,6 +38,7 @@ export function ProposalRoute() {
   const submitVoteMutation = useSubmitVote()
   const proposalQuery = useResolvedProposal(proposalId)
   const epochQuery = useEpochForProposal(proposalQuery.data?.id)
+  const previousEpochQuery = usePreviousEpoch(epochQuery.data?.round)
   const watchParam = searchParams.get('watch')?.trim()
   const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
   const activeAddress = watchedAddress ?? address
@@ -46,6 +48,7 @@ export function ProposalRoute() {
   const timeZone = getCurrentTimeZone()
   const proposal = proposalQuery.data
   const epoch = epochQuery.data ?? null
+  const previousEpoch = previousEpochQuery.data ?? null
   const totalIncentivesUsd = epoch?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
   const bribedRows = useMemo(
     () => proposal ? mergeProposalAndEpoch(proposal, epoch).filter(row => (row.incentiveUsd ?? 0) > 0 || row.bribeTokens.length > 0) : [],
@@ -98,6 +101,10 @@ export function ProposalRoute() {
   const sortedRows = useMemo(
     () => [...filteredRows].sort((a, b) => compareRows(a, b, sortKey)),
     [filteredRows, sortKey],
+  )
+  const bribeDataAnomaly = useMemo(
+    () => proposal ? getBribeDataAnomaly(proposal, epoch, previousEpoch) : null,
+    [epoch, previousEpoch, proposal],
   )
 
   if (proposalQuery.isPending) {
@@ -169,7 +176,13 @@ export function ProposalRoute() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Status" value={capitalize(resolvedProposal.state)} detail={statusLabel} tone="neutral" />
             <MetricCard label="Total votes" value={formatNumber(resolvedProposal.scores_total, 0)} detail="Full Snapshot proposal weight" tone="neutral" />
-            <MetricCard label="Bribed gauges" value={String(bribedRows.length)} detail="Gauges with active bribes" tone="aqua" />
+            <MetricCard
+              label="Bribed gauges"
+              value={String(bribedRows.length)}
+              detail="Gauges with active bribes"
+              tone="aqua"
+              warning={bribeDataAnomaly?.tooltip}
+            />
             <MetricCard label="Bribe efficiency" value={formatUsdRate(rewardRate)} detail="Average $/vote across bribed gauges" tone="lime" />
           </div>
 
@@ -413,7 +426,12 @@ export function ProposalRoute() {
       <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Bribed gauge market</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Bribed gauge market</p>
+              {bribeDataAnomaly
+                ? <WarningBadge message={bribeDataAnomaly.tooltip} />
+                : null}
+            </div>
             <h2 className="mt-2 text-2xl font-semibold text-[var(--cloud-tint)]">All bribed gauges</h2>
           </div>
 
@@ -475,6 +493,25 @@ export function ProposalRoute() {
               : null}
           </div>
         </div>
+
+        {bribeDataAnomaly?.severity === 'severe'
+          ? (
+              <div className="mt-4 flex items-start gap-3 rounded-md border border-[var(--lime-cream)]/35 bg-[color:rgba(231,255,122,0.08)] p-3 text-sm text-[var(--dust-tint)]">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--lime-cream)]" aria-hidden="true" />
+                <p>
+                  Current incentive data is far below the previous round:
+                  {' '}
+                  {formatNumber(bribeDataAnomaly.currentBribedGaugeCount, 0)}
+                  {' '}
+                  bribed gauges vs
+                  {' '}
+                  {formatNumber(bribeDataAnomaly.previousBribedGaugeCount, 0)}
+                  {' '}
+                  last round. Active Votium/Llama data can update during the vote.
+                </p>
+              </div>
+            )
+          : null}
 
         <div className="mt-5 space-y-3">
           {sortedRows.length === 0
@@ -569,7 +606,8 @@ function MetricCard({
   value,
   detail,
   tone,
-}: { label: string, value: string, detail?: string, tone: 'neutral' | 'aqua' | 'lime' }) {
+  warning,
+}: { label: string, value: string, detail?: string, tone: 'neutral' | 'aqua' | 'lime', warning?: string }) {
   const valueClass = tone === 'aqua'
     ? 'text-[var(--pearl-aqua)]'
     : tone === 'lime'
@@ -578,12 +616,28 @@ function MetricCard({
 
   return (
     <div className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] p-4">
-      <p className="text-sm text-[var(--fog-tint)]">{label}</p>
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-[var(--fog-tint)]">{label}</p>
+        {warning ? <WarningBadge message={warning} /> : null}
+      </div>
       <p className={`mt-2 text-2xl font-semibold ${valueClass}`}>{value}</p>
       {detail
         ? <p className="mt-1 text-xs text-[var(--dust-tint)]">{detail}</p>
         : null}
     </div>
+  )
+}
+
+function WarningBadge({ message }: { message: string }) {
+  return (
+    <span
+      className="inline-flex size-5 items-center justify-center rounded-full border border-[var(--lime-cream)]/40 bg-[color:rgba(231,255,122,0.1)] text-[var(--lime-cream)]"
+      role="img"
+      aria-label={message}
+      title={message}
+    >
+      <AlertTriangle className="size-3.5" aria-hidden="true" />
+    </span>
   )
 }
 

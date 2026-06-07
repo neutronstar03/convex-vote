@@ -1,6 +1,25 @@
 import type { PoolRow, SnapshotProposal } from '../proposal/types'
 import type { LlamaEpoch } from './types'
 
+export interface BribeDataAnomaly {
+  severity: 'info' | 'severe'
+  currentBribedGaugeCount: number
+  previousBribedGaugeCount: number
+  currentBribesUsd: number
+  previousBribesUsd: number
+  gaugeCountDrop: number
+  bribesUsdDrop: number
+  roundProgress: number
+  tooltip: string
+}
+
+const MIN_PREVIOUS_BRIBED_GAUGES = 10
+const MIN_ROUND_PROGRESS = 0.2
+const LOW_DATA_DROP_THRESHOLD = 0.5
+const SEVERE_GAUGE_DROP_THRESHOLD = 0.75
+const SEVERE_USD_DROP_THRESHOLD = 0.8
+const TWO_DAYS_SECONDS = 48 * 60 * 60
+
 function toSnapshotChoiceIndex(choice?: number) {
   if (typeof choice !== 'number' || choice < 0) {
     return undefined
@@ -69,4 +88,73 @@ export function mergeProposalAndEpoch(proposal: SnapshotProposal, epoch: LlamaEp
       bribeTokens: bribesByChoice.get(choiceIndex) ?? [],
     }
   })
+}
+
+export function getBribeDataAnomaly(
+  proposal: SnapshotProposal,
+  currentEpoch: LlamaEpoch | null,
+  previousEpoch: LlamaEpoch | null,
+  now = Date.now(),
+): BribeDataAnomaly | null {
+  if (proposal.state.toLowerCase() !== 'active' || !currentEpoch || !previousEpoch) {
+    return null
+  }
+
+  const previousBribedGaugeCount = getBribedChoiceIndexes(previousEpoch).length
+  const currentBribedGaugeCount = getBribedChoiceIndexes(currentEpoch).length
+
+  if (previousBribedGaugeCount < MIN_PREVIOUS_BRIBED_GAUGES) {
+    return null
+  }
+
+  const durationSeconds = proposal.end - proposal.start
+  const elapsedSeconds = (now / 1000) - proposal.start
+  const roundProgress = durationSeconds > 0 ? Math.min(Math.max(elapsedSeconds / durationSeconds, 0), 1) : 0
+  const secondsRemaining = proposal.end - (now / 1000)
+
+  if (roundProgress < MIN_ROUND_PROGRESS && secondsRemaining > TWO_DAYS_SECONDS) {
+    return null
+  }
+
+  const currentBribesUsd = getEpochBribesUsd(currentEpoch)
+  const previousBribesUsd = getEpochBribesUsd(previousEpoch)
+
+  if (previousBribesUsd <= 0) {
+    return null
+  }
+
+  const gaugeCountDrop = getDropRatio(currentBribedGaugeCount, previousBribedGaugeCount)
+  const bribesUsdDrop = getDropRatio(currentBribesUsd, previousBribesUsd)
+
+  if (gaugeCountDrop < LOW_DATA_DROP_THRESHOLD || bribesUsdDrop < LOW_DATA_DROP_THRESHOLD) {
+    return null
+  }
+
+  const severity = gaugeCountDrop >= SEVERE_GAUGE_DROP_THRESHOLD || bribesUsdDrop >= SEVERE_USD_DROP_THRESHOLD
+    ? 'severe'
+    : 'info'
+
+  return {
+    severity,
+    currentBribedGaugeCount,
+    previousBribedGaugeCount,
+    currentBribesUsd,
+    previousBribesUsd,
+    gaugeCountDrop,
+    bribesUsdDrop,
+    roundProgress,
+    tooltip: `${currentBribedGaugeCount} bribed gauges vs ${previousBribedGaugeCount} last round. Active-round incentive data may still be updating.`,
+  }
+}
+
+function getEpochBribesUsd(epoch: LlamaEpoch) {
+  return epoch.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
+}
+
+function getDropRatio(current: number, previous: number) {
+  if (previous <= 0) {
+    return 0
+  }
+
+  return Math.max(0, (previous - current) / previous)
 }
