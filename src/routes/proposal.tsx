@@ -41,6 +41,7 @@ export function ProposalRoute() {
   const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
   const activeAddress = watchedAddress ?? address
   const isWatchMode = Boolean(watchedAddress)
+  const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
   const voteQuery = useUserVote(proposalQuery.data?.id, activeAddress)
   const timeZone = getCurrentTimeZone()
   const proposal = proposalQuery.data
@@ -127,6 +128,7 @@ export function ProposalRoute() {
     : resolvedProposal.state.toLowerCase() === 'active'
       ? `Ends ${formatDateTime(resolvedProposal.end)}`
       : resolvedProposal.state
+  const dashboardLink = activeAddress ? `/?watch=${activeAddress}` : '/'
 
   const handleCopy = async (value: string, label: string) => {
     try {
@@ -179,7 +181,7 @@ export function ProposalRoute() {
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Link
-              to={`/?watch=${activeAddress ?? ''}`}
+              to={dashboardLink}
               className="inline-flex items-center rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
             >
               Back to dashboard
@@ -210,8 +212,26 @@ export function ProposalRoute() {
             <DetailRow label="Start" value={formatDateTime(resolvedProposal.start)} />
             <DetailRow label="End" value={formatDateTime(resolvedProposal.end)} />
             <DetailRow label="Reward tokens" value={summarizeRewardTokens(bribedRows)} />
-            <DetailRow label="Wallet" value={activeAddress ? shortAddress(activeAddress) : 'Not selected'} />
+            <DetailRow
+              label="Wallet"
+              value={hasInvalidWatchAddress ? 'Invalid watch address' : activeAddress ? shortAddress(activeAddress) : 'Not selected'}
+            />
           </dl>
+
+          {hasInvalidWatchAddress
+            ? (
+                <div className="mt-4 rounded-md border border-[var(--hot-fuchsia)]/40 bg-[color:rgba(255,22,84,0.1)] p-3 text-sm text-[var(--dust-tint)]">
+                  <p className="font-medium text-[var(--hot-fuchsia)]">Ignoring invalid watch address</p>
+                  <p className="mt-1">
+                    The
+                    {' '}
+                    <code className="rounded bg-[var(--gunmetal-mist)] px-1 py-0.5 text-xs">watch</code>
+                    {' '}
+                    query param must be a valid EVM address.
+                  </p>
+                </div>
+              )
+            : null}
 
           {copiedLabel
             ? <p className="mt-4 text-xs text-[var(--pearl-aqua)]">{copiedLabel}</p>
