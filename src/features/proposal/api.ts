@@ -2,13 +2,13 @@ import type { SnapshotProposal, SnapshotProposalResponse, SnapshotVote } from '.
 
 const SNAPSHOT_GRAPHQL_URL = 'https://hub.snapshot.org/graphql'
 
-async function snapshotRequest<T>(query: string): Promise<T> {
+async function snapshotRequest<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const response = await fetch(SNAPSHOT_GRAPHQL_URL, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, variables }),
   })
 
   if (!response.ok) {
@@ -55,8 +55,8 @@ export async function fetchRecentGaugeProposals() {
 
 export async function fetchProposalById(id: string) {
   const data = await snapshotRequest<{ proposal: SnapshotProposal | null }>(`
-    query ProposalById {
-      proposal(id: "${id}") {
+    query ProposalById($id: String!) {
+      proposal(id: $id) {
         id
         title
         state
@@ -67,7 +67,7 @@ export async function fetchProposalById(id: string) {
         scores_total
       }
     }
-  `)
+  `, { id })
 
   if (!data.proposal) {
     throw new Error('Proposal not found')
@@ -78,10 +78,10 @@ export async function fetchProposalById(id: string) {
 
 export async function fetchUserVote(proposalId: string, voter: string) {
   const data = await snapshotRequest<{ votes: SnapshotVote[] }>(`
-    query UserVote {
+    query UserVote($proposalId: String!, $voter: String!) {
       votes(
         first: 1
-        where: { proposal: "${proposalId}", voter: "${voter}" }
+        where: { proposal: $proposalId, voter: $voter }
         orderBy: "created"
         orderDirection: desc
       ) {
@@ -91,7 +91,7 @@ export async function fetchUserVote(proposalId: string, voter: string) {
         created
       }
     }
-  `)
+  `, { proposalId, voter })
 
   return data.votes[0] ?? null
 }
