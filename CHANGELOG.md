@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.7 - 2026-06-07
+
+- tightened mobile proposal overview spacing and action buttons
+- compacted mobile bribed-gauge cards with denser padding and 2x2 stat grids
+- improved tap behavior and placement for bribe-data warning popovers
+
 ## v1.0.6 - 2026-06-07
 
 - added active-round bribe anomaly detection against the previous Llama round
