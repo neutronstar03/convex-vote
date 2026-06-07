@@ -154,6 +154,7 @@ export function ProposalRoute() {
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--cloud-tint)]">{resolvedProposal.title}</h1>
           <p className="mt-2 text-sm text-[var(--dust-tint)]">
             Window
+            {' '}
             {formatDateCompact(resolvedProposal.start)}
             {' '}
             →
@@ -229,6 +230,7 @@ export function ProposalRoute() {
               ? (
                   <p className="text-sm text-[var(--fog-tint)]">
                     Voting power
+                    {' '}
                     {formatNumber(voteQuery.data.vp, 0)}
                   </p>
                 )
@@ -247,6 +249,7 @@ export function ProposalRoute() {
                             <p className="truncate text-base font-semibold text-[var(--cloud-tint)]">{recap.label}</p>
                             <p className="mt-1 text-xs text-[var(--fog-tint)]">
                               Your voting weight
+                              {' '}
                               {formatNumber(recap.estimatedVotes, 0)}
                             </p>
                           </div>
@@ -397,6 +400,7 @@ export function ProposalRoute() {
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm text-[var(--fog-tint)]">
               Showing
+              {' '}
               {sortedRows.length}
               {' '}
               of
