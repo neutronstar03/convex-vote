@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.5 - 2026-06-07
+
+- improved proposal page copy spacing and watched-wallet validation feedback
+- moved Snapshot proposal and vote lookups to GraphQL variables
+- delayed claim actions until the initial onchain claim-status check is ready
+
 ## v1.0.4 - 2026-04-25
 
 - rolled wagmi back to a RainbowKit-compatible v2 release to restore reliable Rabby mobile connections
