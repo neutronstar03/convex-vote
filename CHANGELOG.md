@@ -2,13 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.0.5 - 2026-08-04
+## v1.0.8 - 2026-08-04
 
 - switched the live Curve gauge round from stale Snapshot proposals to Convex's current on-chain proposal data
 - matched Votium incentives to live gauges by contract address and exact voting window
 - replaced Snapshot ballot submission with guarded on-chain Convex gauge voting
 - added stale-round, finalized-proposal, timing, and weight-scale checks before wallet submission
-- kept watch mode read-only and updated the dashboard, proposal analytics, links, and copy for the new voting system
+- kept watch mode read-only and preserved the latest mobile, anomaly-warning, and claim-readiness improvements
+
+## v1.0.7 - 2026-06-07
+
+- tightened mobile proposal overview spacing and action buttons
+- compacted mobile bribed-gauge cards with denser padding and 2x2 stat grids
+- improved tap behavior and placement for bribe-data warning popovers
+
+## v1.0.6 - 2026-06-07
+
+- added active-round bribe anomaly detection against the previous Llama round
+- added warning icons and severe-data callouts when current bribe data is far below the previous round
+- kept current live bribe metrics visible while clarifying that active Votium/Llama data may still update
+
+## v1.0.5 - 2026-06-07
+
+- improved proposal page copy spacing and watched-wallet validation feedback
+- moved Snapshot proposal and vote lookups to GraphQL variables
+- delayed claim actions until the initial onchain claim-status check is ready
 
 ## v1.0.4 - 2026-04-25
 

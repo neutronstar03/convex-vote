@@ -18,6 +18,7 @@ export function ClaimsRoute() {
   const unknownClaims = claims.filter(c => c.claimed === undefined)
   const claimableTokens = unclaimedClaims.length > 0 ? unclaimedClaims : unknownClaims
   const totalAvailable = unclaimedClaims.length + unknownClaims.length
+  const isWaitingForClaimStatus = isClaimedLoading && unclaimedClaims.length === 0 && unknownClaims.length > 0
 
   if (!isConnected) {
     return (
@@ -132,7 +133,7 @@ export function ClaimsRoute() {
           />
         )}
 
-        {totalAvailable > 0 && (
+        {totalAvailable > 0 && !isWaitingForClaimStatus && (
           <ClaimAllBar
             address={address!}
             claimableTokens={claimableTokens}
