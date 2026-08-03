@@ -29,6 +29,10 @@ export function validateAllocation(params: {
     return { type: 'negative', message: 'Allocation percentages cannot be negative.' }
   }
 
+  if (values.includes(0)) {
+    return { type: 'empty', message: 'Set a positive weight for every selected gauge, or remove it from the ballot.' }
+  }
+
   const total = values.reduce((sum, v) => sum + v, 0)
 
   if (total < 99.9 || total > 100.1) {

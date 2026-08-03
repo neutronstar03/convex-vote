@@ -35,6 +35,7 @@ export function ProposalRoute() {
   const [showOnlyWalletVotes, setShowOnlyWalletVotes] = useState(false)
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null)
   const [showVoteEditor, setShowVoteEditor] = useState(false)
+  const [draftAllocations, setDraftAllocations] = useState<Record<string, number>>({})
   const [reviewAllocations, setReviewAllocations] = useState<Record<string, number> | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const submitVoteMutation = useSubmitVote()
@@ -112,6 +113,13 @@ export function ProposalRoute() {
     () => proposal ? getBribeDataAnomaly(proposal, epoch, previousEpoch) : null,
     [epoch, previousEpoch, proposal],
   )
+  const draftTotal = Object.values(draftAllocations).reduce((sum, value) => sum + value, 0)
+  const draftGaugeCount = Object.keys(draftAllocations).length
+  const hasEmptyDraftWeight = Object.values(draftAllocations).some(value => !Number.isFinite(value) || value <= 0)
+  const isDraftValid = draftGaugeCount > 0
+    && !hasEmptyDraftWeight
+    && draftTotal >= 99.9
+    && draftTotal <= 100.1
 
   if (proposalQuery.isPending) {
     return (
@@ -153,6 +161,46 @@ export function ProposalRoute() {
       setCopiedLabel(`Failed: ${label}`)
       window.setTimeout(() => setCopiedLabel(current => current === `Failed: ${label}` ? null : current), 1500)
     }
+  }
+
+  const getExistingAllocations = () => voteQuery.data?.voted
+    ? { ...voteQuery.data.allocationPercentages }
+    : {}
+
+  const openBallot = () => {
+    if (!showVoteEditor)
+      setDraftAllocations(getExistingAllocations())
+    setShowVoteEditor(true)
+  }
+
+  const addGaugeToBallot = (gaugeKey: string) => {
+    setDraftAllocations((current) => {
+      const next = showVoteEditor ? { ...current } : getExistingAllocations()
+      if (!Object.hasOwn(next, gaugeKey))
+        next[gaugeKey] = Object.keys(next).length === 0 ? 100 : 0
+      return next
+    })
+    setShowVoteEditor(true)
+  }
+
+  const removeGaugeFromBallot = (gaugeKey: string) => {
+    setDraftAllocations((current) => {
+      const next = { ...current }
+      delete next[gaugeKey]
+      return next
+    })
+  }
+
+  const equalizeDraftAllocations = () => {
+    const keys = Object.keys(draftAllocations)
+    if (keys.length === 0)
+      return
+
+    const weight = Number((100 / keys.length).toFixed(2))
+    const next: Record<string, number> = Object.fromEntries(keys.map(key => [key, weight]))
+    const lastKey = keys.at(-1)!
+    next[lastKey] = Number((weight + (100 - weight * keys.length)).toFixed(2))
+    setDraftAllocations(next)
   }
 
   return (
@@ -322,8 +370,8 @@ export function ProposalRoute() {
       )}
 
       {/* Voting section */}
-      {address && !isWatchMode && proposal && proposal.state === 'active' && (
-        <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5">
+      {!isWatchMode && proposal && proposal.state === 'active' && (
+        <section id="vote-ballot" className="scroll-mt-4 rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Cast your vote</p>
@@ -334,7 +382,7 @@ export function ProposalRoute() {
             {!showVoteEditor && (
               <button
                 type="button"
-                onClick={() => setShowVoteEditor(true)}
+                onClick={openBallot}
                 className="rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
               >
                 {voteQuery.data?.voted ? 'Edit vote' : 'Start voting'}
@@ -355,11 +403,25 @@ export function ProposalRoute() {
           {showVoteEditor && (
             <div className="mt-4">
               <AllocationEditor
-                choices={proposal.gauges.map(gauge => ({ key: gauge.key, name: gauge.label }))}
+                choices={proposal.gauges.map(gauge => ({
+                  key: gauge.key,
+                  name: gauge.label,
+                  subtitle: `${capitalize(gauge.blockchainId)} · Gauge ${shortAddress(gauge.gaugeAddress)} · Root ${shortAddress(gauge.rootGaugeAddress)}`,
+                  searchText: [
+                    gauge.gaugeAddress,
+                    gauge.rootGaugeAddress,
+                    gauge.poolAddress,
+                    gauge.blockchainId,
+                    ...gauge.coins.map(coin => coin.symbol),
+                    ...gauge.coins.map(coin => coin.address),
+                  ].filter(Boolean).join(' '),
+                }))}
                 isConnected={Boolean(address)}
                 proposalActive={proposal.state === 'active'}
                 votingPower={voteQuery.data?.voted ? voteQuery.data.votingPower : undefined}
-                existingAllocations={voteQuery.data?.voted ? voteQuery.data.allocationPercentages : undefined}
+                allocations={draftAllocations}
+                isRevote={Boolean(voteQuery.data?.voted)}
+                onChange={setDraftAllocations}
                 onSubmit={(allocations) => {
                   setReviewAllocations(allocations)
                   setIsReviewOpen(true)
@@ -424,6 +486,8 @@ export function ProposalRoute() {
                   onSuccess: () => {
                     setIsReviewOpen(false)
                     setReviewAllocations(null)
+                    setDraftAllocations({})
+                    setShowVoteEditor(false)
                   },
                   onError: () => {
                     // Keep modal open for retry
@@ -439,7 +503,7 @@ export function ProposalRoute() {
         </section>
       )}
 
-      <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-4 sm:p-5">
+      <section id="bribed-gauges" className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-4 sm:p-5">
         <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -539,11 +603,12 @@ export function ProposalRoute() {
             : null}
           {sortedRows.map((row) => {
             const isWalletRow = walletChoiceKeys.has(row.choiceKey)
+            const isBallotRow = showVoteEditor && Object.hasOwn(draftAllocations, row.choiceKey)
 
             return (
               <article
                 key={row.choiceKey}
-                className={`rounded-md border px-3 py-3 sm:px-4 sm:py-4 ${isWalletRow ? 'border-[var(--hyper-magenta)]/50 bg-[color:rgba(171,58,255,0.08)]' : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]'}`}
+                className={`rounded-md border px-3 py-3 sm:px-4 sm:py-4 ${isBallotRow ? 'border-[var(--lime-cream)]/55 bg-[color:rgba(231,255,122,0.06)]' : isWalletRow ? 'border-[var(--hyper-magenta)]/50 bg-[color:rgba(171,58,255,0.08)]' : 'border-[var(--steel-haze)] bg-[var(--carbon-ink)]'}`}
               >
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
                   <div className="min-w-0">
@@ -551,6 +616,9 @@ export function ProposalRoute() {
                       <h3 className="text-sm font-semibold text-[var(--cloud-tint)] sm:text-base">{row.label}</h3>
                       {isWalletRow
                         ? <span className="rounded-md border border-[var(--hyper-magenta)]/40 bg-[color:rgba(171,58,255,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--lime-cream)]">Your vote</span>
+                        : null}
+                      {isBallotRow
+                        ? <span className="rounded-md border border-[var(--lime-cream)]/40 bg-[color:rgba(231,255,122,0.1)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--lime-cream)]">In ballot</span>
                         : null}
                     </div>
                     <p className="mt-1 text-xs text-[var(--fog-tint)]">
@@ -596,11 +664,109 @@ export function ProposalRoute() {
                     <DataPill label="Bribe efficiency" value={formatUsdRate(row.rewardEfficiency ?? undefined)} tone="lime" />
                   </div>
                 </div>
+
+                {!isWatchMode && resolvedProposal.state === 'active'
+                  ? (
+                      <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--steel-haze)]/50 pt-3">
+                        {isBallotRow
+                          ? (
+                              <>
+                                <label className="flex items-center gap-2 text-sm text-[var(--dust-tint)]">
+                                  <span>Vote weight</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={draftAllocations[row.choiceKey] || ''}
+                                    onChange={event => setDraftAllocations(current => ({
+                                      ...current,
+                                      [row.choiceKey]: Number.parseFloat(event.target.value) || 0,
+                                    }))}
+                                    aria-label={`Vote weight for ${row.label}`}
+                                    className="w-20 rounded-md border border-[var(--lime-cream)]/40 bg-[var(--slate-machine)] px-2 py-1.5 text-right text-sm text-[var(--cloud-tint)] outline-none"
+                                  />
+                                  <span>%</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removeGaugeFromBallot(row.choiceKey)}
+                                  className="rounded-md border border-[var(--steel-haze)] px-3 py-1.5 text-sm text-[var(--fog-tint)] transition hover:border-[var(--hot-fuchsia)]/50 hover:text-[var(--hot-fuchsia)]"
+                                >
+                                  Remove
+                                </button>
+                              </>
+                            )
+                          : (
+                              <button
+                                type="button"
+                                onClick={() => addGaugeToBallot(row.choiceKey)}
+                                className="rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
+                              >
+                                {isWalletRow ? 'Edit this allocation' : 'Add to ballot'}
+                              </button>
+                            )}
+                      </div>
+                    )
+                  : null}
               </article>
             )
           })}
         </div>
       </section>
+
+      {!isWatchMode && resolvedProposal.state === 'active' && showVoteEditor && draftGaugeCount > 0
+        ? (
+            <div className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--lime-cream)]/40 bg-[color:rgba(28,34,39,0.97)] px-4 py-3 shadow-2xl backdrop-blur sm:inset-x-6">
+              <div>
+                <p className="text-sm font-semibold text-[var(--cloud-tint)]">
+                  {draftGaugeCount}
+                  {' '}
+                  {draftGaugeCount === 1 ? 'gauge' : 'gauges'}
+                  {' '}
+                  in ballot
+                </p>
+                <p className={`text-xs ${isDraftValid ? 'text-[var(--lime-cream)]' : 'text-[var(--hot-fuchsia)]'}`}>
+                  Total
+                  {' '}
+                  {draftTotal.toFixed(1)}
+                  %
+                  {isDraftValid
+                    ? ' · Ready to review'
+                    : hasEmptyDraftWeight
+                      ? ' · Set every selected gauge above 0%'
+                      : ' · Must equal 100%'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={equalizeDraftAllocations}
+                  className="rounded-md border border-[var(--steel-haze)] px-3 py-2 text-sm text-[var(--dust-tint)] hover:bg-[var(--gunmetal-mist)]"
+                >
+                  Equal split
+                </button>
+                <a
+                  href="#vote-ballot"
+                  className="rounded-md border border-[var(--steel-haze)] px-3 py-2 text-sm text-[var(--dust-tint)] hover:bg-[var(--gunmetal-mist)]"
+                >
+                  View ballot
+                </a>
+                <button
+                  type="button"
+                  disabled={!isDraftValid || !address}
+                  onClick={() => {
+                    setReviewAllocations({ ...draftAllocations })
+                    setIsReviewOpen(true)
+                  }}
+                  className="rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110 disabled:opacity-40"
+                >
+                  {address ? 'Review vote' : 'Connect wallet to review'}
+                </button>
+              </div>
+            </div>
+          )
+        : null}
     </AppShell>
   )
 }

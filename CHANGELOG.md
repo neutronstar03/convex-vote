@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.10 - 2026-08-04
+
+- added direct vote controls to every incentivized gauge card
+- unified card controls, ballot weights, and full-gauge search under one synchronized draft
+- added search by pool, token, chain, pool address, gauge address, and root gauge address
+- added a persistent ballot action bar and allowed ballot preparation before wallet connection
+- rejected selected gauges with zero weight before vote review
+
 ## v1.0.9 - 2026-08-04
 
 - fixed duplicate React keys when a gauge has multiple bribes denominated in the same token
