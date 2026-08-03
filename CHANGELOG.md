@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.9 - 2026-08-04
+
+- fixed duplicate React keys when a gauge has multiple bribes denominated in the same token
+
 ## v1.0.8 - 2026-08-04
 
 - switched the live Curve gauge round from stale Snapshot proposals to Convex's current on-chain proposal data

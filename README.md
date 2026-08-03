@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.9: fixed duplicate-token rendering keys in proposal incentive cards
 - v1.0.8: migrated live gauge rounds and voting from Snapshot to Convex's on-chain system
 - v1.0.7: tightened mobile proposal and gauge-card spacing
 - v1.0.6: added active-round bribe anomaly warnings against the previous Llama round

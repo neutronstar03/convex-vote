@@ -304,8 +304,8 @@ export function ProposalRoute() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-1.5">
-                          {(row?.bribeTokens ?? []).map(token => (
-                            <TokenChip key={`${recap.choiceKey}-${token.symbol}`} symbol={token.symbol} />
+                          {(row?.bribeTokens ?? []).map((token, index) => (
+                            <TokenChip key={`${recap.choiceKey}-${token.symbol}-${index}`} symbol={token.symbol} />
                           ))}
                         </div>
 
@@ -562,8 +562,8 @@ export function ProposalRoute() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
                       {row.bribeTokens.length > 0
-                        ? row.bribeTokens.map(token => (
-                            <TokenChip key={`${row.choiceKey}-${token.symbol}`} symbol={token.symbol} amountUsd={token.amountUsd} />
+                        ? row.bribeTokens.map((token, index) => (
+                            <TokenChip key={`${row.choiceKey}-${token.symbol}-${index}`} symbol={token.symbol} amountUsd={token.amountUsd} />
                           ))
                         : <span className="text-xs text-[var(--fog-tint)]">No reward tokens detected</span>}
                     </div>
