@@ -2,11 +2,11 @@ import { useCallback, useMemo, useState } from 'react'
 import { validateAllocation } from './validateAllocation'
 
 interface AllocationEditorProps {
-  choices: string[] // pool names, indexed by choice number (1-based)
+  choices: Array<{ key: string, name: string }>
   isConnected: boolean
   proposalActive: boolean
   votingPower: number | undefined
-  existingAllocations?: Record<string, number> // from current vote, e.g. { "1": 60, "2": 30 }
+  existingAllocations?: Record<string, number>
   onSubmit: (allocations: Record<string, number>) => void
   isSubmitting: boolean
 }
@@ -39,10 +39,9 @@ export function AllocationEditor({
 
   const filteredChoices = useMemo(() => {
     if (!searchTerm.trim())
-      return choices.map((name, i) => ({ key: String(i + 1), name }))
+      return choices
     const lower = searchTerm.toLowerCase()
     return choices
-      .map((name, i) => ({ key: String(i + 1), name }))
       .filter(({ name }) => name.toLowerCase().includes(lower))
   }, [choices, searchTerm])
 
@@ -134,7 +133,8 @@ export function AllocationEditor({
     )
   }
 
-  const selectedEntries = Array.from(selectedPools, key => ({ key, name: choices[Number(key) - 1] ?? `Choice ${key}`, value: allocations[key] ?? 0 }))
+  const choiceNames = new Map(choices.map(choice => [choice.key, choice.name]))
+  const selectedEntries = Array.from(selectedPools, key => ({ key, name: choiceNames.get(key) ?? key, value: allocations[key] ?? 0 }))
     .sort((a, b) => b.value - a.value)
 
   return (

@@ -1,34 +1,53 @@
-export interface SnapshotProposal {
+export type HexAddress = `0x${string}`
+
+export type GaugeRoundState = 'pending' | 'active' | 'closed'
+
+export interface GaugeCoin {
+  address: HexAddress
+  symbol: string
+  blockchainId: string
+}
+
+export interface GaugeVote {
   id: string
+  key: string
+  label: string
+  blockchainId: string
+  gaugeAddress: HexAddress
+  rootGaugeAddress: HexAddress
+  poolAddress: HexAddress | null
+  coins: GaugeCoin[]
+  poolUrls: string[]
+  votes: number
+}
+
+export interface GaugeRound {
+  id: string
+  source: 'convex'
+  platform: 'curve'
+  proposalId: number
+  epoch: number
   title: string
-  state: string
+  state: GaugeRoundState
   start: number
   end: number
-  choices: string[]
-  scores: number[]
-  scores_total: number
-}
-
-export interface SnapshotProposalResponse {
-  proposals: SnapshotProposal[]
-}
-
-export interface SnapshotVote {
-  voter: string
-  choice: number | Record<string, number>
-  vp: number
-  created: number
+  totalVotes: number
+  voterCount: number
+  gauges: GaugeVote[]
 }
 
 export interface PoolRow {
-  choiceIndex: number
   choiceKey: string
   label: string
-  snapshotVotes: number
+  votes: number
   voteShare: number
-  incentiveUsd?: number
-  rewardEfficiency?: number
-  gaugeAddress?: string
+  incentiveUsd: number
+  rewardEfficiency: number | null
+  gaugeAddress: HexAddress
+  rootGaugeAddress: HexAddress
+  poolAddress: HexAddress | null
+  blockchainId: string
+  poolUrls: string[]
   bribeTokens: Array<{
     symbol: string
     amount: number

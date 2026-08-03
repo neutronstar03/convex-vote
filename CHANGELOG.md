@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.5 - 2026-08-04
+
+- switched the live Curve gauge round from stale Snapshot proposals to Convex's current on-chain proposal data
+- matched Votium incentives to live gauges by contract address and exact voting window
+- replaced Snapshot ballot submission with guarded on-chain Convex gauge voting
+- added stale-round, finalized-proposal, timing, and weight-scale checks before wallet submission
+- kept watch mode read-only and updated the dashboard, proposal analytics, links, and copy for the new voting system
+
 ## v1.0.4 - 2026-04-25
 
 - rolled wagmi back to a RainbowKit-compatible v2 release to restore reliable Rabby mobile connections

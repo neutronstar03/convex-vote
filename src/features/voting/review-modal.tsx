@@ -1,8 +1,6 @@
-import type { Dispatch, SetStateAction } from 'react'
-
 interface ReviewModalProps {
-  allocations: Record<string, number> // { "1": 60, "2": 30 }
-  choiceNames: string[] // indexed 0-based, choice key "1" = index 0
+  allocations: Record<string, number>
+  choiceNames: Record<string, string>
   total: number
   isRevote: boolean
   isOpen: boolean
@@ -10,7 +8,6 @@ interface ReviewModalProps {
   error: string | null
   onConfirm: () => void
   onCancel: () => void
-  setModalOpen: Dispatch<SetStateAction<boolean>>
 }
 
 export function ReviewModal({
@@ -45,7 +42,7 @@ export function ReviewModal({
           {entries.map(([key, weight]) => (
             <div key={key} className="flex items-center justify-between rounded-md bg-[var(--carbon-ink)] px-3 py-2 text-sm">
               <span className="min-w-0 flex-1 truncate text-[var(--cloud-tint)]">
-                {choiceNames[Number(key) - 1] ?? `Choice ${key}`}
+                {choiceNames[key] ?? key}
               </span>
               <span className="ml-3 font-semibold text-[var(--pearl-aqua)]">
                 {weight.toFixed(1)}
@@ -86,7 +83,7 @@ export function ReviewModal({
             disabled={isSubmitting}
             className="flex-1 rounded-md bg-[var(--hyper-magenta)] px-4 py-2.5 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110 disabled:opacity-40"
           >
-            Sign in wallet
+            Submit transaction
           </button>
           <button
             type="button"
@@ -99,7 +96,7 @@ export function ReviewModal({
         </div>
 
         <p className="mt-3 text-center text-xs text-[var(--fog-tint)]">
-          This is an off-chain EIP-712 signature. No gas is required.
+          This submits an on-chain Ethereum transaction and requires gas.
         </p>
       </div>
     </div>

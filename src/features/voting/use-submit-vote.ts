@@ -8,8 +8,9 @@ export function useSubmitVote() {
   return useMutation({
     mutationFn: (params: SubmitVoteParams) => submitVote(params),
     onSuccess: () => {
-      // Invalidate user vote query to refetch
+      // Refresh both the app-level vote query and Wagmi contract reads.
       queryClient.invalidateQueries({ queryKey: ['vote'] })
+      queryClient.invalidateQueries({ queryKey: ['readContract'] })
     },
   })
 }

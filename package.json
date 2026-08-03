@@ -1,7 +1,7 @@
 {
   "name": "convex-vote",
   "type": "module",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "author": "neutronstar03",
   "repository": "https://github.com/neutronstar03/convex-vote",
@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "bun test",
     "lint": "eslint .",
     "typecheck": "tsc -b",
     "preview:cf": "bun run build && cp -R functions ./build/client/functions && wrangler pages dev ./build/client",
@@ -17,7 +18,6 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@rainbow-me/rainbowkit": "^2.2.10",
-    "@snapshot-labs/snapshot.js": "^0.14.20",
     "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",

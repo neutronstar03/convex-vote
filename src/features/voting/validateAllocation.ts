@@ -36,7 +36,7 @@ export function validateAllocation(params: {
   }
 
   if (votingPower !== undefined && votingPower === 0) {
-    return { type: 'zero_vp', message: 'You may not have voting power for this space.' }
+    return { type: 'zero_vp', message: 'You may not have voting power for this Convex round.' }
   }
 
   return null

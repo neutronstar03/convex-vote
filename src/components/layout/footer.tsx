@@ -153,12 +153,12 @@ export function Footer() {
               </a>
               <span className="text-[var(--steel-haze)]">·</span>
               <a
-                href="https://snapshot.box/#/cvx.eth"
+                href="https://www.convexfinance.com/vote/weights/curve"
                 target="_blank"
                 rel="noreferrer"
                 className="transition hover:text-[var(--cloud-tint)]"
               >
-                Snapshot
+                Convex Governance
               </a>
               <span className="text-[var(--steel-haze)]">·</span>
               <a

@@ -3,12 +3,13 @@ import { formatCompactNumber, formatCompactUsd } from '../../lib/format'
 interface VoteSummaryStatsProps {
   roundNumber?: number | null
   totalVotes: number
+  efficiencyVotes?: number
   totalIncentivesUsd?: number
 }
 
-export function VoteSummaryStats({ roundNumber, totalVotes, totalIncentivesUsd }: VoteSummaryStatsProps) {
-  const dollarsPerVote = totalIncentivesUsd !== undefined && totalVotes > 0
-    ? totalIncentivesUsd / totalVotes
+export function VoteSummaryStats({ roundNumber, totalVotes, efficiencyVotes = totalVotes, totalIncentivesUsd }: VoteSummaryStatsProps) {
+  const dollarsPerVote = totalIncentivesUsd !== undefined && efficiencyVotes > 0
+    ? totalIncentivesUsd / efficiencyVotes
     : undefined
 
   const items = [
@@ -23,7 +24,7 @@ export function VoteSummaryStats({ roundNumber, totalVotes, totalIncentivesUsd }
       label: 'Votes',
       value: formatCompactNumber(totalVotes),
       detail: '',
-      trailing: 'CVX',
+      trailing: 'vlCVX',
       testId: 'summary-total-votes',
     },
     {

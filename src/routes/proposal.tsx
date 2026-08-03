@@ -1,15 +1,17 @@
-import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
+import type { GaugeVote, PoolRow } from '../features/proposal/types'
+import type { ConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
-import { useEpochForProposal } from '../features/incentives/queries'
+import { useEpochForRound } from '../features/incentives/queries'
 import { mergeProposalAndEpoch } from '../features/incentives/utils'
-import { useResolvedProposal, useUserVote } from '../features/proposal/queries'
+import { useResolvedProposal } from '../features/proposal/queries'
 import { AllocationEditor } from '../features/voting/allocation-editor'
 import { ReviewModal } from '../features/voting/review-modal'
+import { useConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { useSubmitVote } from '../features/voting/use-submit-vote'
 import { formatCompactUsd, formatDateCompact, formatDateTime, formatNumber, formatPercent, getCurrentTimeZone } from '../lib/format'
 
@@ -36,22 +38,26 @@ export function ProposalRoute() {
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const submitVoteMutation = useSubmitVote()
   const proposalQuery = useResolvedProposal(proposalId)
-  const epochQuery = useEpochForProposal(proposalQuery.data?.id)
+  const proposal = proposalQuery.data
+  const epochQuery = useEpochForRound(proposal)
   const watchParam = searchParams.get('watch')?.trim()
   const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
   const activeAddress = watchedAddress ?? address
   const isWatchMode = Boolean(watchedAddress)
-  const voteQuery = useUserVote(proposalQuery.data?.id, activeAddress)
+  const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
   const timeZone = getCurrentTimeZone()
-  const proposal = proposalQuery.data
   const epoch = epochQuery.data ?? null
   const totalIncentivesUsd = epoch?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
   const bribedRows = useMemo(
     () => proposal ? mergeProposalAndEpoch(proposal, epoch).filter(row => (row.incentiveUsd ?? 0) > 0 || row.bribeTokens.length > 0) : [],
     [epoch, proposal],
   )
+  const bribedVotes = useMemo(
+    () => bribedRows.reduce((sum, row) => sum + row.votes, 0),
+    [bribedRows],
+  )
   const walletVoteRecap = useMemo(
-    () => proposal && voteQuery.data ? getWalletVoteRecap(voteQuery.data, proposal, bribedRows) : [],
+    () => proposal && voteQuery.data?.voted ? getWalletVoteRecap(voteQuery.data, proposal.gauges, bribedRows) : [],
     [bribedRows, proposal, voteQuery.data],
   )
   const walletChoiceKeys = useMemo(
@@ -65,8 +71,8 @@ export function ProposalRoute() {
     })),
     [bribedRows, walletVoteRecap],
   )
-  const rewardRate = totalIncentivesUsd !== undefined && bribedRows.length > 0
-    ? totalIncentivesUsd / bribedRows.reduce((sum, row) => sum + row.snapshotVotes, 0)
+  const rewardRate = totalIncentivesUsd !== undefined && bribedVotes > 0
+    ? totalIncentivesUsd / bribedVotes
     : undefined
   const rewardTokenOptions = useMemo(
     () => ['all', ...new Set(bribedRows.flatMap(row => row.bribeTokens.map(token => token.symbol)).sort())],
@@ -144,7 +150,8 @@ export function ProposalRoute() {
     <AppShell>
       <VoteSummaryStats
         roundNumber={epoch?.round}
-        totalVotes={bribedRows.reduce((sum, row) => sum + row.snapshotVotes, 0)}
+        totalVotes={resolvedProposal.totalVotes}
+        efficiencyVotes={bribedVotes}
         totalIncentivesUsd={totalIncentivesUsd}
       />
 
@@ -165,15 +172,15 @@ export function ProposalRoute() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Status" value={capitalize(resolvedProposal.state)} detail={statusLabel} tone="neutral" />
-            <MetricCard label="Total votes" value={formatNumber(resolvedProposal.scores_total, 0)} detail="Full Snapshot proposal weight" tone="neutral" />
+            <MetricCard label="Total votes" value={formatNumber(resolvedProposal.totalVotes, 0)} detail={`${resolvedProposal.voterCount} on-chain voters`} tone="neutral" />
             <MetricCard label="Bribed gauges" value={String(bribedRows.length)} detail="Gauges with active bribes" tone="aqua" />
             <MetricCard label="Bribe efficiency" value={formatUsdRate(rewardRate)} detail="Average $/vote across bribed gauges" tone="lime" />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2 text-xs">
             <CompactInfoChip label="Bribes" value={formatCompactUsd(totalIncentivesUsd)} tone="aqua" />
-            <CompactInfoChip label="Llama round" value={epoch ? String(epoch.round) : epochQuery.isPending ? 'Loading…' : 'Not matched'} tone="neutral" />
-            <CompactInfoChip label="Snapshot id" value={`${resolvedProposal.id.slice(0, 10)}…`} tone="neutral" />
+            <CompactInfoChip label="Votium round" value={epoch ? String(epoch.round) : epochQuery.isPending ? 'Loading…' : 'Not matched'} tone="neutral" />
+            <CompactInfoChip label="Convex epoch" value={String(resolvedProposal.epoch)} tone="neutral" />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -184,12 +191,12 @@ export function ProposalRoute() {
               Back to dashboard
             </Link>
             <a
-              href={`https://snapshot.box/#/cvx.eth/proposal/${resolvedProposal.id}`}
+              href="https://www.convexfinance.com/vote/weights/curve"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
             >
-              Open Snapshot proposal
+              Open Convex Governance
             </a>
           </div>
         </article>
@@ -225,11 +232,12 @@ export function ProposalRoute() {
               <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Your proposal position</p>
               <h2 className="mt-2 text-2xl font-semibold text-[var(--cloud-tint)]">Wallet-voted gauges</h2>
             </div>
-            {voteQuery.data
+            {voteQuery.data?.voted
               ? (
                   <p className="text-sm text-[var(--fog-tint)]">
                     Voting power
-                    {formatNumber(voteQuery.data.vp, 0)}
+                    {' '}
+                    {formatNumber(voteQuery.data.votingPower, 0)}
                   </p>
                 )
               : null}
@@ -275,13 +283,13 @@ export function ProposalRoute() {
       )}
 
       {/* Voting section */}
-      {activeAddress && proposal && proposal.state.toLowerCase() === 'active' && (
+      {address && !isWatchMode && proposal && proposal.state === 'active' && (
         <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-sm uppercase tracking-[0.24em] text-[var(--pearl-aqua)]">Cast your vote</p>
               <h2 className="mt-2 text-2xl font-semibold text-[var(--cloud-tint)]">
-                {voteQuery.data ? 'Update your vote' : 'Vote on this proposal'}
+                {voteQuery.data?.voted ? 'Update your vote' : 'Vote on this proposal'}
               </h2>
             </div>
             {!showVoteEditor && (
@@ -290,25 +298,29 @@ export function ProposalRoute() {
                 onClick={() => setShowVoteEditor(true)}
                 className="rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
               >
-                {voteQuery.data ? 'Edit vote' : 'Start voting'}
+                {voteQuery.data?.voted ? 'Edit vote' : 'Start voting'}
               </button>
             )}
           </div>
 
-          {voteQuery.data && !showVoteEditor && (
+          {voteQuery.data?.voted && !showVoteEditor && (
             <p className="mt-3 text-sm text-[var(--dust-tint)]">
               You have already voted on this proposal. You can update your vote at any time before the proposal closes.
             </p>
           )}
 
+          <p className="mt-3 text-sm text-[var(--fog-tint)]">
+            This is an on-chain Ethereum vote. If you delegated your gauge vote, voting directly overrides the delegate allocation for your weight.
+          </p>
+
           {showVoteEditor && (
             <div className="mt-4">
               <AllocationEditor
-                choices={proposal.choices}
+                choices={proposal.gauges.map(gauge => ({ key: gauge.key, name: gauge.label }))}
                 isConnected={Boolean(address)}
-                proposalActive={proposal.state.toLowerCase() === 'active'}
-                votingPower={voteQuery.data?.vp}
-                existingAllocations={voteQuery.data && typeof voteQuery.data.choice === 'object' ? voteQuery.data.choice as Record<string, number> : undefined}
+                proposalActive={proposal.state === 'active'}
+                votingPower={voteQuery.data?.voted ? voteQuery.data.votingPower : undefined}
+                existingAllocations={voteQuery.data?.voted ? voteQuery.data.allocationPercentages : undefined}
                 onSubmit={(allocations) => {
                   setReviewAllocations(allocations)
                   setIsReviewOpen(true)
@@ -329,19 +341,19 @@ export function ProposalRoute() {
             <div className="mt-4 rounded-md border border-[var(--lime-cream)]/35 bg-[color:rgba(231,255,122,0.08)] p-4">
               <p className="font-semibold text-[var(--lime-cream)]">Vote submitted successfully!</p>
               <p className="mt-1 text-sm text-[var(--dust-tint)]">
-                Your vote has been recorded on Snapshot.
-                {submitVoteMutation.data?.id && (
+                Your vote has been recorded on-chain.
+                {submitVoteMutation.data?.transactionHash && (
                   <>
                     {' '}
                     Receipt:
                     {' '}
                     <a
-                      href={`https://snapshot.box/#/cvx.eth/proposal/${proposal.id}`}
+                      href={`https://etherscan.io/tx/${submitVoteMutation.data.transactionHash}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[var(--pearl-aqua)] underline hover:no-underline"
                     >
-                      {submitVoteMutation.data.id.slice(0, 10)}
+                      {submitVoteMutation.data.transactionHash.slice(0, 10)}
                       ...
                     </a>
                   </>
@@ -352,9 +364,9 @@ export function ProposalRoute() {
 
           <ReviewModal
             allocations={reviewAllocations ?? {}}
-            choiceNames={proposal.choices}
+            choiceNames={Object.fromEntries(proposal.gauges.map(gauge => [gauge.key, gauge.label]))}
             total={reviewAllocations ? Object.values(reviewAllocations).reduce((s, v) => s + v, 0) : 0}
-            isRevote={Boolean(voteQuery.data)}
+            isRevote={Boolean(voteQuery.data?.voted)}
             isOpen={isReviewOpen}
             isSubmitting={submitVoteMutation.isPending}
             error={submitVoteMutation.error?.message ?? null}
@@ -363,7 +375,9 @@ export function ProposalRoute() {
                 return
               submitVoteMutation.mutate(
                 {
-                  proposalId: proposal.id,
+                  proposalId: proposal.proposalId,
+                  proposalStart: proposal.start,
+                  proposalEnd: proposal.end,
                   allocations: reviewAllocations,
                   account: address,
                 },
@@ -382,7 +396,6 @@ export function ProposalRoute() {
               setIsReviewOpen(false)
               setReviewAllocations(null)
             }}
-            setModalOpen={setIsReviewOpen}
           />
         </section>
       )}
@@ -477,9 +490,11 @@ export function ProposalRoute() {
                         : null}
                     </div>
                     <p className="mt-1 text-xs text-[var(--fog-tint)]">
-                      Choice #
-                      {row.choiceIndex}
-                      {row.gaugeAddress ? ` · Gauge ${shortAddress(row.gaugeAddress)}` : ''}
+                      {capitalize(row.blockchainId)}
+                      {' · '}
+                      Gauge
+                      {' '}
+                      {shortAddress(row.gaugeAddress)}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {row.bribeTokens.length > 0
@@ -511,10 +526,10 @@ export function ProposalRoute() {
                   </div>
 
                   <div className="grid min-w-[260px] gap-2 text-right sm:grid-cols-2 xl:grid-cols-4 xl:text-left">
-                    <DataPill label="Votes" value={formatNumber(row.snapshotVotes, 0)} tone="neutral" />
+                    <DataPill label="Votes" value={formatNumber(row.votes, 0)} tone="neutral" />
                     <DataPill label="Vote share" value={formatPercent(row.voteShare)} tone="neutral" />
                     <DataPill label="Total bribes" value={formatCompactUsd(row.incentiveUsd)} tone="aqua" />
-                    <DataPill label="Bribe efficiency" value={formatUsdRate(row.rewardEfficiency)} tone="lime" />
+                    <DataPill label="Bribe efficiency" value={formatUsdRate(row.rewardEfficiency ?? undefined)} tone="lime" />
                   </div>
                 </div>
               </article>
@@ -529,14 +544,14 @@ export function ProposalRoute() {
 function compareRows(a: PoolRow, b: PoolRow, sortKey: SortKey) {
   switch (sortKey) {
     case 'efficiency':
-      return (b.rewardEfficiency ?? 0) - (a.rewardEfficiency ?? 0) || (b.incentiveUsd ?? 0) - (a.incentiveUsd ?? 0)
+      return (b.rewardEfficiency ?? 0) - (a.rewardEfficiency ?? 0) || b.incentiveUsd - a.incentiveUsd
     case 'votes':
-      return b.snapshotVotes - a.snapshotVotes || (b.incentiveUsd ?? 0) - (a.incentiveUsd ?? 0)
+      return b.votes - a.votes || b.incentiveUsd - a.incentiveUsd
     case 'voteShare':
       return b.voteShare - a.voteShare || (b.incentiveUsd ?? 0) - (a.incentiveUsd ?? 0)
     case 'incentives':
     default:
-      return (b.incentiveUsd ?? 0) - (a.incentiveUsd ?? 0) || b.snapshotVotes - a.snapshotVotes
+      return b.incentiveUsd - a.incentiveUsd || b.votes - a.votes
   }
 }
 
@@ -625,27 +640,6 @@ function MiniStat({ label, value, tone, detail }: { label: string, value: string
   )
 }
 
-function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
-  if (typeof vote.choice === 'number') {
-    return [{ choiceKey: String(vote.choice), label: proposal.choices[vote.choice - 1] ?? `Choice ${vote.choice}`, weight: 100.00 }]
-  }
-
-  const entries = Object.entries(vote.choice)
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0)
-
-  if (total <= 0) {
-    return []
-  }
-
-  return entries
-    .map(([choiceKey, weight]) => ({
-      choiceKey,
-      label: proposal.choices[Number(choiceKey) - 1] ?? `Choice ${choiceKey}`,
-      weight: Number(((weight / total) * 100).toFixed(2)),
-    }))
-    .sort((a, b) => b.weight - a.weight)
-}
-
 interface WalletVoteRecapItem {
   choiceKey: string
   label: string
@@ -655,17 +649,18 @@ interface WalletVoteRecapItem {
   estimatedTokenSummary: string
 }
 
-function getWalletVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal, poolRows: PoolRow[]): WalletVoteRecapItem[] {
+function getWalletVoteRecap(vote: ConvexUserVote, gauges: GaugeVote[], poolRows: PoolRow[]): WalletVoteRecapItem[] {
   const poolRowsByChoiceKey = new Map(poolRows.map(row => [row.choiceKey, row]))
+  const gaugeNames = new Map(gauges.map(gauge => [gauge.key, gauge.label]))
 
-  return getVoteRecap(vote, proposal)
-    .map((item) => {
-      const poolRow = poolRowsByChoiceKey.get(item.choiceKey)
-      const estimatedVotes = vote.vp * (item.weight / 100)
-      const userShareOfGauge = poolRow?.snapshotVotes && poolRow.snapshotVotes > 0
-        ? estimatedVotes / poolRow.snapshotVotes
+  return Object.entries(vote.allocationPercentages)
+    .map(([choiceKey, weight]) => {
+      const poolRow = poolRowsByChoiceKey.get(choiceKey)
+      const estimatedVotes = vote.votingPower * (weight / 100)
+      const userShareOfGauge = poolRow?.votes && poolRow.votes > 0
+        ? estimatedVotes / poolRow.votes
         : undefined
-      const estimatedUsd = userShareOfGauge !== undefined && poolRow?.incentiveUsd !== undefined
+      const estimatedUsd = userShareOfGauge !== undefined && poolRow
         ? poolRow.incentiveUsd * userShareOfGauge
         : undefined
       const estimatedTokens = userShareOfGauge !== undefined
@@ -676,9 +671,9 @@ function getWalletVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal, pool
         : []
 
       return {
-        choiceKey: item.choiceKey,
-        label: item.label,
-        weight: item.weight,
+        choiceKey,
+        label: gaugeNames.get(choiceKey) ?? shortAddress(choiceKey),
+        weight,
         estimatedVotes,
         estimatedUsd,
         estimatedTokenSummary: estimatedTokens.length

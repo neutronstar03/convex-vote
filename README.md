@@ -6,11 +6,12 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.5: migrated live gauge rounds and voting from Snapshot to Convex's on-chain system
 - v1.0.4: rolled wagmi back to the RainbowKit-compatible v2 stack for more reliable Rabby mobile connections
 - v1.0.3: enabled WalletConnect mobile wallet connections via RainbowKit default config
 - v1.0.2: fixed 502 error on claims by bypassing Worker subrequest limits
 - v1.0.1: added footer with version info and fixed TypeScript errors
-- v1.0.0: added Votium bribe claiming and in-app Snapshot voting
+- v1.0.0: added Votium bribe claiming and the first in-app voting flow
 - v0.1.0: first public release
 - deployed on Cloudflare Pages at `https://cvx.ns03.dev`
 - added same-origin Llama proxying and first-party Umami analytics support
@@ -20,6 +21,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 - shows the latest Convex gauge round in a readable dashboard
 - highlights your wallet allocations and estimated rewards
 - breaks down bribed gauges, reward tokens, and bribe efficiency
+- submits Curve gauge allocations directly to Convex's on-chain vote platform
 - supports read-only wallet watch mode with `?watch=0x...`
 - provides a richer proposal page for exploring bribed gauges and your position in the round
 
@@ -49,7 +51,7 @@ The current product direction is:
 
 The app is live at **https://cvx.ns03.dev**.
 
-Production deploys run on Cloudflare Pages with same-origin proxying for Llama Airforce data and first-party analytics forwarding for Umami.
+Production deploys run on Cloudflare Pages with same-origin proxying for Convex and Llama Airforce data, plus first-party analytics forwarding for Umami.
 
 ## Local development
 
@@ -70,8 +72,8 @@ Then open:
 - TypeScript
 - Tailwind CSS
 - Wagmi / RainbowKit
-- Snapshot GraphQL
-- Llama Airforce bribe data
+- Convex current-proposal API and gauge voting contracts
+- Votium incentive data via Llama Airforce
 
 ## License
 

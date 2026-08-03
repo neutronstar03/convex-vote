@@ -1,72 +1,63 @@
-import type { PoolRow, SnapshotProposal } from '../proposal/types'
-import type { LlamaEpoch } from './types'
+import type { GaugeRound, GaugeVote, PoolRow } from '../proposal/types'
+import type { LlamaBribe, LlamaEpoch } from './types'
+import { normalizeAddress } from '../proposal/utils'
 
-function toSnapshotChoiceIndex(choice?: number) {
-  if (typeof choice !== 'number' || choice < 0) {
-    return undefined
-  }
-
-  return choice + 1
+function getGaugeAddressKeys(gauge: Pick<GaugeVote, 'gaugeAddress' | 'rootGaugeAddress'>) {
+  return [normalizeAddress(gauge.rootGaugeAddress), normalizeAddress(gauge.gaugeAddress)]
 }
 
-export function getBribedChoiceIndexes(epoch: LlamaEpoch | null) {
-  return [...new Set(
-    (epoch?.bribes ?? [])
-      .map(bribe => toSnapshotChoiceIndex(bribe.choice))
-      .filter((choice): choice is number => typeof choice === 'number' && choice > 0),
-  )]
-}
-
-export function getBribedVotesTotal(proposal: SnapshotProposal, epoch: LlamaEpoch | null) {
-  const bribedChoices = getBribedChoiceIndexes(epoch)
-
-  if (bribedChoices.length === 0) {
-    return proposal.scores_total
-  }
-
-  return bribedChoices.reduce((sum, choiceIndex) => sum + (proposal.scores[choiceIndex - 1] ?? 0), 0)
-}
-
-export function mergeProposalAndEpoch(proposal: SnapshotProposal, epoch: LlamaEpoch | null): PoolRow[] {
-  const bribesByChoice = new Map<number, PoolRow['bribeTokens']>()
-  const incentiveUsdByChoice = new Map<number, number>()
-  const gaugeByChoice = new Map<number, string>()
+function getBribesByGauge(epoch: LlamaEpoch | null) {
+  const result = new Map<string, LlamaBribe[]>()
 
   for (const bribe of epoch?.bribes ?? []) {
-    const choiceIndex = toSnapshotChoiceIndex(bribe.choice)
-
-    if (!choiceIndex)
-      continue
-
-    const tokens = bribesByChoice.get(choiceIndex) ?? []
-    tokens.push({
-      symbol: bribe.token,
-      amount: bribe.amount,
-      amountUsd: bribe.amountDollars,
-    })
-    bribesByChoice.set(choiceIndex, tokens)
-    incentiveUsdByChoice.set(choiceIndex, (incentiveUsdByChoice.get(choiceIndex) ?? 0) + bribe.amountDollars)
-
-    if (bribe.gauge) {
-      gaugeByChoice.set(choiceIndex, bribe.gauge)
-    }
+    const key = normalizeAddress(bribe.gauge)
+    const bribes = result.get(key) ?? []
+    bribes.push(bribe)
+    result.set(key, bribes)
   }
 
-  return proposal.choices.map((label, index) => {
-    const choiceIndex = index + 1
-    const snapshotVotes = proposal.scores[index] ?? 0
-    const incentiveUsd = incentiveUsdByChoice.get(choiceIndex)
+  return result
+}
+
+export function getBribedGaugeKeys(epoch: LlamaEpoch | null) {
+  return [...new Set((epoch?.bribes ?? []).map(bribe => normalizeAddress(bribe.gauge)))]
+}
+
+export function getBribedVotesTotal(round: GaugeRound, epoch: LlamaEpoch | null) {
+  const bribedKeys = new Set(getBribedGaugeKeys(epoch))
+
+  return round.gauges.reduce((total, gauge) => {
+    const isBribed = getGaugeAddressKeys(gauge).some(key => bribedKeys.has(key))
+    return total + (isBribed ? gauge.votes : 0)
+  }, 0)
+}
+
+export function mergeProposalAndEpoch(round: GaugeRound, epoch: LlamaEpoch | null): PoolRow[] {
+  const bribesByGauge = getBribesByGauge(epoch)
+
+  return round.gauges.map((gauge) => {
+    const bribes = getGaugeAddressKeys(gauge)
+      .map(key => bribesByGauge.get(key))
+      .find((candidate): candidate is LlamaBribe[] => candidate !== undefined) ?? []
+    const incentiveUsd = bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
 
     return {
-      choiceIndex,
-      choiceKey: String(choiceIndex),
-      label,
-      snapshotVotes,
-      voteShare: proposal.scores_total > 0 ? snapshotVotes / proposal.scores_total : 0,
+      choiceKey: gauge.key,
+      label: gauge.label,
+      votes: gauge.votes,
+      voteShare: round.totalVotes > 0 ? gauge.votes / round.totalVotes : 0,
       incentiveUsd,
-      rewardEfficiency: incentiveUsd && snapshotVotes > 0 ? incentiveUsd / snapshotVotes : undefined,
-      gaugeAddress: gaugeByChoice.get(choiceIndex),
-      bribeTokens: bribesByChoice.get(choiceIndex) ?? [],
+      rewardEfficiency: incentiveUsd > 0 && gauge.votes > 0 ? incentiveUsd / gauge.votes : null,
+      gaugeAddress: gauge.gaugeAddress,
+      rootGaugeAddress: gauge.rootGaugeAddress,
+      poolAddress: gauge.poolAddress,
+      blockchainId: gauge.blockchainId,
+      poolUrls: gauge.poolUrls,
+      bribeTokens: bribes.map(bribe => ({
+        symbol: bribe.token,
+        amount: bribe.amount,
+        amountUsd: bribe.amountDollars,
+      })),
     }
   })
 }

@@ -1,4 +1,5 @@
-import type { PoolRow, SnapshotProposal, SnapshotVote } from '../features/proposal/types'
+import type { GaugeVote, PoolRow } from '../features/proposal/types'
+import type { ConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { ArrowRight, ExternalLink } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -6,24 +7,25 @@ import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
-import { useEpochForProposal } from '../features/incentives/queries'
+import { useEpochForRound } from '../features/incentives/queries'
 import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
-import { useRecentGaugeProposals, useResolvedProposal, useUserVote } from '../features/proposal/queries'
-import { getCountdownParts, getEstimatedNextVoteStart } from '../features/proposal/utils'
+import { useResolvedProposal } from '../features/proposal/queries'
+import { getCountdownParts } from '../features/proposal/utils'
+import { useConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { formatCompactUsd, formatDateCompact, formatDateTimeCompact, formatDateTimeMs, formatNumber, getCurrentTimeZone } from '../lib/format'
 
 export function HomeRoute() {
   const { address, isConnected } = useAccount()
   const [searchParams] = useSearchParams()
   const proposalQuery = useResolvedProposal()
-  const recentProposalsQuery = useRecentGaugeProposals()
-  const epochQuery = useEpochForProposal(proposalQuery.data?.id)
+  const proposal = proposalQuery.data
+  const epochQuery = useEpochForRound(proposal)
   const watchParam = searchParams.get('watch')?.trim()
   const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
   const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
   const activeAddress = watchedAddress ?? address
   const isWatchMode = Boolean(watchedAddress)
-  const voteQuery = useUserVote(proposalQuery.data?.id, activeAddress)
+  const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -35,13 +37,8 @@ export function HomeRoute() {
   }, [])
 
   const timeZone = useMemo(() => getCurrentTimeZone(), [])
-  const proposal = proposalQuery.data
   const voteWindow = proposal ? getVoteWindowState(proposal.start, proposal.end, now) : null
-  const nextVoteStart = proposal && recentProposalsQuery.data
-    ? getEstimatedNextVoteStart(recentProposalsQuery.data, proposal)
-    : null
   const currentVoteLabel = epochQuery.data?.round ? `Current vote ${epochQuery.data.round}` : 'Current vote'
-  const snapshotProposalUrl = proposal ? `https://snapshot.box/#/cvx.eth/proposal/${proposal.id}` : 'https://snapshot.box/#/cvx.eth'
   const totalIncentivesUsd = epochQuery.data?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
   const summaryVotes = proposal ? getBribedVotesTotal(proposal, epochQuery.data ?? null) : 0
   const rewardRate = totalIncentivesUsd !== undefined && summaryVotes > 0
@@ -52,7 +49,7 @@ export function HomeRoute() {
     [proposal, epochQuery.data],
   )
   const walletVoteRecap = useMemo(
-    () => proposal && voteQuery.data ? getWalletVoteRecap(voteQuery.data, proposal, poolRows) : [],
+    () => proposal && voteQuery.data?.voted ? getWalletVoteRecap(voteQuery.data, proposal.gauges, poolRows) : [],
     [poolRows, proposal, voteQuery.data],
   )
   const hasWalletVote = walletVoteRecap.length > 0
@@ -68,7 +65,8 @@ export function HomeRoute() {
         ? (
             <VoteSummaryStats
               roundNumber={epochQuery.data?.round}
-              totalVotes={summaryVotes}
+              totalVotes={proposal.totalVotes}
+              efficiencyVotes={summaryVotes}
               totalIncentivesUsd={totalIncentivesUsd}
             />
           )
@@ -128,13 +126,13 @@ export function HomeRoute() {
                 <ArrowRight className="size-4" />
               </Link>
               <a
-                href={snapshotProposalUrl}
+                href="https://www.convexfinance.com/vote/weights/curve"
                 target="_blank"
                 rel="noreferrer"
-                data-testid="home-official-snapshot-link"
+                data-testid="home-official-convex-link"
                 className="inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
               >
-                Official Snapshot
+                Convex Governance
                 <ExternalLink className="size-4" />
               </a>
             </div>
@@ -177,13 +175,13 @@ export function HomeRoute() {
 
                     {voteQuery.isPending
                       ? <p className="mt-3 text-sm text-[var(--dust-tint)]">Loading current vote…</p>
-                      : voteQuery.data
+                      : voteQuery.data?.voted
                         ? (
                             <>
                               <p className="mt-4 text-sm text-[var(--dust-tint)]">
                                 Voting power:
                                 {' '}
-                                {formatNumber(voteQuery.data.vp, 0)}
+                                {formatNumber(voteQuery.data.votingPower, 0)}
                               </p>
                               <ul className={`mt-4 ${hasWalletVote ? 'space-y-3.5' : 'space-y-3'} text-sm text-[var(--dust-tint)]`} data-testid="wallet-vote-recap-list">
                                 {walletVoteRecap.slice(0, 4).map(item => (
@@ -233,7 +231,7 @@ export function HomeRoute() {
                               </p>
                             </>
                           )
-                        : <p className="mt-3 text-sm text-[var(--dust-tint)]">No vote found yet for this wallet on the current proposal.</p>}
+                        : <p className="mt-3 text-sm text-[var(--dust-tint)]">No direct on-chain vote found for this wallet. Delegated allocations are not shown yet.</p>}
                   </>
                 )}
           </aside>
@@ -251,14 +249,14 @@ export function HomeRoute() {
           <TimetableItem
             label="Window"
             value={proposal ? `${formatDateTimeCompact(proposal.start)} → ${formatDateTimeCompact(proposal.end)}` : '—'}
-            detail={proposal ? `Shown in ${timeZone}` : 'Waiting for Snapshot data'}
+            detail={proposal ? `Shown in ${timeZone}` : 'Waiting for Convex data'}
             testId="current-vote-window"
           />
           <TimetableItem
-            label="Next vote"
-            value={nextVoteStart ? formatDateTimeCompact(nextVoteStart) : 'Unknown'}
-            detail={nextVoteStart ? 'Estimated from previous gauge cadence' : 'Not enough recent cadence data'}
-            testId="next-vote-estimate"
+            label="On-chain voters"
+            value={proposal ? formatNumber(proposal.voterCount, 0) : '—'}
+            detail={proposal ? `Convex epoch ${proposal.epoch}` : 'Waiting for Convex data'}
+            testId="current-voter-count"
           />
         </div>
       </section>
@@ -273,13 +271,13 @@ export function HomeRoute() {
             Full proposal analytics
           </Link>
           <a
-            href="https://snapshot.box/#/cvx.eth"
+            href="https://www.convexfinance.com/vote/weights/curve"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
-            data-testid="home-space-link"
+            data-testid="home-convex-link"
           >
-            cvx.eth space
+            Vote on Convex
           </a>
           <span className="inline-flex items-center rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm text-[var(--dust-tint)]" data-testid="home-timezone-pill">
             {timeZone}
@@ -356,27 +354,6 @@ function formatCountdown(countdown: ReturnType<typeof getCountdownParts>) {
   return `${countdown.days}d ${countdown.hours}h ${countdown.minutes}m`
 }
 
-function getVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal) {
-  if (typeof vote.choice === 'number') {
-    return [{ choiceKey: String(vote.choice), label: proposal.choices[vote.choice - 1] ?? `Choice ${vote.choice}`, weight: 100.00 }]
-  }
-
-  const entries = Object.entries(vote.choice)
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0)
-
-  if (total <= 0) {
-    return []
-  }
-
-  return entries
-    .map(([choiceKey, weight]) => ({
-      choiceKey,
-      label: proposal.choices[Number(choiceKey) - 1] ?? `Choice ${choiceKey}`,
-      weight: Number(((weight / total) * 100).toFixed(2)),
-    }))
-    .sort((a, b) => b.weight - a.weight)
-}
-
 interface WalletVoteRecapItem {
   label: string
   weight: number
@@ -388,17 +365,18 @@ interface WalletVoteRecapItem {
   estimatedTokenSummary: string
 }
 
-function getWalletVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal, poolRows: PoolRow[]): WalletVoteRecapItem[] {
+function getWalletVoteRecap(vote: ConvexUserVote, gauges: GaugeVote[], poolRows: PoolRow[]): WalletVoteRecapItem[] {
   const poolRowsByChoiceKey = new Map(poolRows.map(row => [row.choiceKey, row]))
+  const gaugeNames = new Map(gauges.map(gauge => [gauge.key, gauge.label]))
 
-  return getVoteRecap(vote, proposal)
-    .map((item) => {
-      const poolRow = poolRowsByChoiceKey.get(item.choiceKey)
-      const estimatedVotes = vote.vp * (item.weight / 100)
-      const userShareOfGauge = poolRow?.snapshotVotes && poolRow.snapshotVotes > 0
-        ? estimatedVotes / poolRow.snapshotVotes
+  return Object.entries(vote.allocationPercentages)
+    .map(([choiceKey, weight]) => {
+      const poolRow = poolRowsByChoiceKey.get(choiceKey)
+      const estimatedVotes = vote.votingPower * (weight / 100)
+      const userShareOfGauge = poolRow?.votes && poolRow.votes > 0
+        ? estimatedVotes / poolRow.votes
         : undefined
-      const estimatedUsd = userShareOfGauge !== undefined && poolRow?.incentiveUsd !== undefined
+      const estimatedUsd = userShareOfGauge !== undefined && poolRow
         ? poolRow.incentiveUsd * userShareOfGauge
         : undefined
       const estimatedTokens = userShareOfGauge !== undefined
@@ -409,11 +387,11 @@ function getWalletVoteRecap(vote: SnapshotVote, proposal: SnapshotProposal, pool
         : []
 
       return {
-        label: item.label,
-        weight: item.weight,
+        label: gaugeNames.get(choiceKey) ?? shortAddress(choiceKey),
+        weight,
         estimatedVotes,
         incentiveUsd: poolRow?.incentiveUsd,
-        rewardRateLabel: poolRow?.rewardEfficiency !== undefined
+        rewardRateLabel: poolRow?.rewardEfficiency != null
           ? `${formatCompactUsd(poolRow.rewardEfficiency, 2)}/vote at current totals`
           : 'No incentive efficiency available',
         bribeTokenSummary: poolRow?.bribeTokens.length

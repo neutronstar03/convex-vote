@@ -25,7 +25,7 @@ export function AppShell({ children }: PropsWithChildren) {
               Convex Vote
             </Link>
             <p className="text-sm text-[var(--dust-tint)]">
-              Snapshot voting dashboard for cvx.eth gauge rounds.
+              Live Convex gauge voting and Votium incentive analytics.
             </p>
           </div>
 
