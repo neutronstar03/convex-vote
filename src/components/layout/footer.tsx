@@ -121,10 +121,10 @@ export function Footer() {
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             {author
               ? (
-                  <div className="inline-flex items-center gap-1.5">
+                  <div className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap">
                     <span>Made by</span>
                     {author.url == null
                       ? <span>{author.name}</span>
@@ -142,30 +142,30 @@ export function Footer() {
                 )
               : <span />}
 
-            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+            <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-1 sm:justify-end sm:gap-x-4">
               <a
                 href="https://cvx.ns03.dev"
                 target="_blank"
                 rel="noreferrer"
-                className="transition hover:text-[var(--cloud-tint)]"
+                className="whitespace-nowrap transition hover:text-[var(--cloud-tint)]"
               >
                 Convex Vote
               </a>
-              <span className="text-[var(--steel-haze)]">·</span>
+              <span className="hidden text-[var(--steel-haze)] sm:inline">·</span>
               <a
                 href="https://www.convexfinance.com/vote/weights/curve"
                 target="_blank"
                 rel="noreferrer"
-                className="transition hover:text-[var(--cloud-tint)]"
+                className="whitespace-nowrap transition hover:text-[var(--cloud-tint)]"
               >
                 Convex Governance
               </a>
-              <span className="text-[var(--steel-haze)]">·</span>
+              <span className="hidden text-[var(--steel-haze)] sm:inline">·</span>
               <a
                 href="https://votium.app"
                 target="_blank"
                 rel="noreferrer"
-                className="transition hover:text-[var(--cloud-tint)]"
+                className="whitespace-nowrap transition hover:text-[var(--cloud-tint)]"
               >
                 Votium
               </a>

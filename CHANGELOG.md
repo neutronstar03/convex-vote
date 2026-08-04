@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.12 - 2026-08-04
+
+- stacked footer metadata and navigation cleanly on mobile widths
+- kept author and footer links intact while hiding orphaned mobile separators
+
 ## v1.0.11 - 2026-08-04
 
 - handled Convex's valid `currentProposal: null` response between voting rounds
