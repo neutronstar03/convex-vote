@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.0.11: added a resilient between-round state when Convex has no active proposal
 - v1.0.10: added direct gauge-card voting with a synchronized ballot and identifier search
 - v1.0.9: fixed duplicate-token rendering keys in proposal incentive cards
 - v1.0.8: migrated live gauge rounds and voting from Snapshot to Convex's on-chain system

@@ -59,6 +59,61 @@ export function HomeRoute() {
       ? 'border-[var(--pearl-aqua)]/50 bg-[color:rgba(120,218,228,0.12)] text-[var(--pearl-aqua)]'
       : 'border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/40 text-[var(--dust-tint)]'
 
+  if (proposalQuery.isError) {
+    return (
+      <AppShell>
+        <section className="rounded-lg border border-[var(--hot-fuchsia)]/40 bg-[color:rgba(255,22,84,0.1)] p-8 text-[var(--cloud-tint)]" data-testid="home-proposal-error">
+          <h1 className="text-xl font-semibold">Unable to check the current Convex vote</h1>
+          <p className="mt-2 text-sm text-[var(--dust-tint)]">
+            The app will retry automatically. You can also check Convex Governance directly.
+          </p>
+          <a
+            href="https://www.convexfinance.com/vote/weights/curve"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
+          >
+            Convex Governance
+            <ExternalLink className="size-4" />
+          </a>
+        </section>
+      </AppShell>
+    )
+  }
+
+  if (proposalQuery.isSuccess && proposal === null) {
+    return (
+      <AppShell>
+        <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-6 sm:p-8" data-testid="home-no-active-round">
+          <div className="max-w-2xl">
+            <span className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--dust-tint)]">
+              Between rounds
+            </span>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--cloud-tint)]">
+              No active Convex gauge vote
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-[var(--dust-tint)]">
+              The latest voting window has ended and Convex has not opened the next one yet. Voting controls will return here automatically when the next round becomes active.
+            </p>
+            <p className="mt-3 text-xs text-[var(--fog-tint)]">
+              Checking Convex for a new round every 30 seconds.
+            </p>
+            <a
+              href="https://www.convexfinance.com/vote/weights/curve"
+              target="_blank"
+              rel="noreferrer"
+              data-testid="home-official-convex-link"
+              className="mt-6 inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
+            >
+              Check Convex Governance
+              <ExternalLink className="size-4" />
+            </a>
+          </div>
+        </section>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell>
       {proposal

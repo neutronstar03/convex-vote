@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.11 - 2026-08-04
+
+- handled Convex's valid `currentProposal: null` response between voting rounds
+- replaced the misleading permanent loading state with a clear between-round message
+- hid voting controls until Convex opens the next proposal while keeping automatic polling enabled
+- added regression coverage for active, inter-round, and unavailable historical proposal states
+
 ## v1.0.10 - 2026-08-04
 
 - added direct vote controls to every incentivized gauge card

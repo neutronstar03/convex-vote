@@ -143,6 +143,47 @@ export function ProposalRoute() {
     )
   }
 
+  if (proposal === null) {
+    return (
+      <AppShell>
+        <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-6 sm:p-8" data-testid="proposal-no-active-round">
+          <div className="max-w-2xl">
+            <span className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--dust-tint)]">
+              Between rounds
+            </span>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--cloud-tint)]">
+              No active Convex gauge vote
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-[var(--dust-tint)]">
+              Convex has closed the previous voting window and has not opened the next one yet. There is nothing available to submit right now.
+            </p>
+            <p className="mt-3 text-xs text-[var(--fog-tint)]">
+              This page checks for a new round every 30 seconds and will recover automatically.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
+              >
+                <ArrowLeft className="size-4" />
+                Back to dashboard
+              </Link>
+              <a
+                href="https://www.convexfinance.com/vote/weights/curve"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
+              >
+                Check Convex Governance
+                <ExternalLink className="size-4" />
+              </a>
+            </div>
+          </div>
+        </section>
+      </AppShell>
+    )
+  }
+
   const resolvedProposal = proposal!
   const statusLabel = resolvedProposal.state.toLowerCase() === 'closed'
     ? `Ended ${formatDateTime(resolvedProposal.end)}`

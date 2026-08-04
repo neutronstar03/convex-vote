@@ -41,7 +41,7 @@ const currentProposalResponseSchema = z.object({
     totalVotedVlcvx: nonNegativeNumberSchema,
     voterCount: z.number().int().nonnegative(),
     allGaugeVotes: z.array(votedGaugeSchema),
-  }),
+  }).nullable(),
   activeGaugesData: z.array(gaugeSchema),
 })
 
@@ -104,9 +104,13 @@ function toGaugeVote(gauge: RawGauge, votes: number): GaugeVote {
   }
 }
 
-export function parseCurrentGaugeRound(input: unknown): GaugeRound {
+export function parseCurrentGaugeRound(input: unknown): GaugeRound | null {
   const payload = currentProposalResponseSchema.parse(input)
   const current = payload.currentProposal
+
+  if (current === null)
+    return null
+
   const votedByAddress = new Map<string, RawVotedGauge>()
 
   for (const gauge of current.allGaugeVotes) {
@@ -151,6 +155,9 @@ export async function fetchCurrentGaugeRound() {
 
 export async function fetchProposalById(id: string) {
   const round = await fetchCurrentGaugeRound()
+
+  if (round === null)
+    throw new Error('No active gauge round is available; historical gauge rounds are not available')
 
   if (round.id !== id && String(round.proposalId) !== id)
     throw new Error('Historical gauge rounds are not available')
