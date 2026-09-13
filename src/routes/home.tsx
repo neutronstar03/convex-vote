@@ -1,4 +1,4 @@
-import type { GaugeVote, PoolRow } from '../features/proposal/types'
+import type { GaugeRound, GaugeVote, PoolRow } from '../features/proposal/types'
 import type { ConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { ArrowRight, ExternalLink } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -7,6 +7,7 @@ import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
+import { Eyebrow, Panel, StatusBadge } from '../components/ui/primitives'
 import { useEpochForRound } from '../features/incentives/queries'
 import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
 import { useResolvedProposal } from '../features/proposal/queries'
@@ -25,6 +26,7 @@ export function HomeRoute() {
   const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
   const activeAddress = watchedAddress ?? address
   const isWatchMode = Boolean(watchedAddress)
+  const showWalletPanel = Boolean(activeAddress || hasInvalidWatchAddress || isConnected)
   const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
   const [now, setNow] = useState(() => Date.now())
 
@@ -62,7 +64,7 @@ export function HomeRoute() {
   if (proposalQuery.isError) {
     return (
       <AppShell>
-        <section className="rounded-lg border border-[var(--hot-fuchsia)]/40 bg-[color:rgba(255,22,84,0.1)] p-8 text-[var(--cloud-tint)]" data-testid="home-proposal-error">
+        <Panel className="border-[var(--color-danger)]/40 bg-[color:rgba(255,77,115,0.1)] p-6 text-[var(--color-text)] sm:p-8" data-testid="home-proposal-error">
           <h1 className="text-xl font-semibold">Unable to check the current Convex vote</h1>
           <p className="mt-2 text-sm text-[var(--dust-tint)]">
             The app will retry automatically. You can also check Convex Governance directly.
@@ -76,7 +78,7 @@ export function HomeRoute() {
             Convex Governance
             <ExternalLink className="size-4" />
           </a>
-        </section>
+        </Panel>
       </AppShell>
     )
   }
@@ -84,7 +86,7 @@ export function HomeRoute() {
   if (proposalQuery.isSuccess && proposal === null) {
     return (
       <AppShell>
-        <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-6 sm:p-8" data-testid="home-no-active-round">
+        <Panel className="p-6 sm:p-8" data-testid="home-no-active-round">
           <div className="max-w-2xl">
             <span className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--dust-tint)]">
               Between rounds
@@ -109,7 +111,7 @@ export function HomeRoute() {
               <ExternalLink className="size-4" />
             </a>
           </div>
-        </section>
+        </Panel>
       </AppShell>
     )
   }
@@ -118,30 +120,42 @@ export function HomeRoute() {
     <AppShell>
       {proposal
         ? (
-            <VoteSummaryStats
-              roundNumber={epochQuery.data?.round}
-              totalVotes={proposal.totalVotes}
-              efficiencyVotes={summaryVotes}
-              totalIncentivesUsd={totalIncentivesUsd}
-            />
+            <>
+              <VoteSummaryStats
+                roundNumber={epochQuery.data?.round}
+                totalVotes={proposal.totalVotes}
+                efficiencyVotes={summaryVotes}
+                totalIncentivesUsd={totalIncentivesUsd}
+              />
+              <DataHealthStrip
+                convexUpdatedAt={proposalQuery.dataUpdatedAt}
+                convexState={getConvexDataState(proposalQuery)}
+                llamaUpdatedAt={epochQuery.dataUpdatedAt}
+                llamaState={getLlamaDataState({
+                  hasData: epochQuery.data !== undefined && epochQuery.data !== null,
+                  isError: epochQuery.isError,
+                  isPending: epochQuery.isPending,
+                })}
+              />
+            </>
           )
         : null}
 
       <section
-        className={`grid gap-3 ${hasWalletVote ? 'lg:grid-cols-[1.15fr_0.75fr]' : 'lg:grid-cols-[1.45fr_0.8fr]'}`}
+        className={`grid gap-3 ${showWalletPanel ? (hasWalletVote ? 'lg:grid-cols-[1.15fr_0.75fr]' : 'lg:grid-cols-[1.45fr_0.8fr]') : ''}`}
         data-testid="home-top-row"
       >
-        <div
-          className={`rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] ${hasWalletVote ? 'order-2 min-h-[200px] p-4' : 'order-1 p-5'}`}
+        <Panel
+          className={`min-w-0 ${hasWalletVote ? 'order-2 min-h-[200px] p-4' : 'order-1 p-5'}`}
           data-testid="home-hero-pill"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--dust-tint)]" data-testid="home-current-vote-pill">
+                <StatusBadge tone="neutral" className="uppercase tracking-[0.14em]" data-testid="home-current-vote-pill">
                   {proposalQuery.isPending ? 'Loading vote…' : currentVoteLabel}
-                </span>
-                <span className={`rounded-md border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${urgencyClass}`} data-testid="home-vote-status-pill">
+                </StatusBadge>
+                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${urgencyClass}`} data-testid="home-vote-status-pill">
                   {voteWindow?.label ?? 'Unavailable'}
                 </span>
               </div>
@@ -192,11 +206,11 @@ export function HomeRoute() {
               </a>
             </div>
           </div>
-        </div>
+        </Panel>
 
-        {(activeAddress || hasInvalidWatchAddress || isConnected) && (
+        {showWalletPanel && (
           <aside
-            className={`rounded-lg border border-[var(--steel-haze)] bg-[var(--carbon-ink)] ${hasWalletVote ? 'order-1 p-5' : 'order-2 p-4'}`}
+            className={`ui-panel-inset ${hasWalletVote ? 'order-1 p-5' : 'order-2 p-4'}`}
             data-testid="wallet-vote-recap-pill"
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -293,7 +307,7 @@ export function HomeRoute() {
         )}
       </section>
 
-      <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-4" data-testid="vote-timetable-pill">
+      <Panel className="p-3 sm:p-4" data-testid="vote-timetable-pill">
         <div className="grid gap-3 lg:grid-cols-[1fr_1.15fr_0.9fr]">
           <TimetableItem
             label="Current vote"
@@ -314,31 +328,20 @@ export function HomeRoute() {
             testId="current-voter-count"
           />
         </div>
-      </section>
+      </Panel>
 
-      <section className="rounded-lg border border-[var(--steel-haze)] bg-[var(--slate-machine)] p-4" data-testid="home-secondary-links">
-        <div className="flex flex-wrap gap-3">
-          <Link
-            to="/proposal/latest"
-            className="inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
-            data-testid="home-latest-proposal-link"
-          >
-            Full proposal analytics
-          </Link>
-          <a
-            href="https://www.convexfinance.com/vote/weights/curve"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm text-[var(--cloud-tint)] transition hover:bg-[var(--gunmetal-mist)]"
-            data-testid="home-convex-link"
-          >
-            Vote on Convex
-          </a>
-          <span className="inline-flex items-center rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-4 py-2 text-sm text-[var(--dust-tint)]" data-testid="home-timezone-pill">
-            {timeZone}
-          </span>
+      <Panel className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="home-secondary-links">
+        <div className="min-w-0">
+          <Eyebrow>Data sources</Eyebrow>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">Convex voting state and Votium incentive data are read separately.</p>
         </div>
-      </section>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Link to="/proposal/latest" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-action)]/50 bg-[color:rgba(197,46,240,0.12)] px-3 py-2 font-semibold text-[var(--color-text)]" data-testid="home-latest-proposal-link">Full analytics →</Link>
+          <a href="https://www.convexfinance.com/vote/weights/curve" target="_blank" rel="noreferrer" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-3 py-2 font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)]" data-testid="home-convex-link">Convex Governance ↗</a>
+          <a href="https://votium.app" target="_blank" rel="noreferrer" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-3 py-2 font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)]">Votium ↗</a>
+          <span className="inline-flex items-center rounded-full border border-[color:rgba(120,218,228,0.28)] bg-[color:rgba(120,218,228,0.08)] px-3 py-2 text-[var(--color-info)]" data-testid="home-timezone-pill">{timeZone}</span>
+        </div>
+      </Panel>
     </AppShell>
   )
 }
@@ -350,6 +353,118 @@ function TimetableItem({ label, value, detail, testId }: { label: string, value:
       <h2 className="mt-2 text-base font-semibold text-[var(--cloud-tint)]">{value}</h2>
       <p className="mt-1 text-sm text-[var(--dust-tint)]">{detail}</p>
     </article>
+  )
+}
+
+interface DataState {
+  kind: 'pending' | 'error' | 'unmatched' | 'ready'
+  label: string
+  detail: string
+}
+
+export function getLlamaDataState({ hasData, isError, isPending }: { hasData: boolean, isError: boolean, isPending: boolean }): DataState {
+  if (isPending) {
+    return {
+      kind: 'pending',
+      label: 'Waiting for Llama',
+      detail: 'Incentive data is still loading. Values are unavailable for now.',
+    }
+  }
+
+  if (isError) {
+    return {
+      kind: 'error',
+      label: 'Llama unavailable',
+      detail: 'Could not load incentive data. This is not a zero-incentive result.',
+    }
+  }
+
+  if (!hasData) {
+    return {
+      kind: 'unmatched',
+      label: 'No matching Llama round',
+      detail: 'No incentive snapshot matches this Convex window. This is not a zero-incentive result.',
+    }
+  }
+
+  return {
+    kind: 'ready',
+    label: 'Llama updated',
+    detail: 'Incentive data is matched to the current Convex window.',
+  }
+}
+
+function getConvexDataState(query: { data: GaugeRound | null | undefined, isError: boolean, isPending: boolean }): DataState {
+  if (query.isPending) {
+    return {
+      kind: 'pending',
+      label: 'Checking Convex',
+      detail: 'Loading the current on-chain voting window.',
+    }
+  }
+
+  if (query.isError) {
+    return {
+      kind: 'error',
+      label: 'Convex unavailable',
+      detail: 'Could not load the current on-chain voting window.',
+    }
+  }
+
+  if (!query.data) {
+    return {
+      kind: 'unmatched',
+      label: 'Between rounds',
+      detail: 'Convex has no active voting window right now.',
+    }
+  }
+
+  return {
+    kind: 'ready',
+    label: 'Convex current',
+    detail: 'On-chain voting data is loaded for the active window.',
+  }
+}
+
+function DataHealthStrip({
+  convexState,
+  convexUpdatedAt,
+  llamaState,
+  llamaUpdatedAt,
+}: {
+  convexState: DataState
+  convexUpdatedAt: number
+  llamaState: DataState
+  llamaUpdatedAt: number
+}) {
+  return (
+    <Panel className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4" data-testid="home-data-health">
+      <DataSourceStatus name="Convex on-chain" state={convexState} updatedAt={convexUpdatedAt} />
+      <DataSourceStatus name="Llama incentives" state={llamaState} updatedAt={llamaUpdatedAt} />
+    </Panel>
+  )
+}
+
+function DataSourceStatus({ name, state, updatedAt }: { name: string, state: DataState, updatedAt: number }) {
+  const tone = state.kind === 'error' ? 'danger' : state.kind === 'ready' ? 'info' : 'neutral'
+  return (
+    <div className="ui-panel-inset flex min-w-0 items-start justify-between gap-3 px-3 py-3">
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-faint)]">{name}</p>
+        <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">{state.label}</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--color-text-subtle)]">{state.detail}</p>
+        {state.kind === 'ready' && updatedAt > 0
+          ? (
+              <p className="mt-1 text-[11px] text-[var(--color-text-faint)]">
+                Updated
+                {' '}
+                {formatDateTimeMs(updatedAt)}
+              </p>
+            )
+          : null}
+      </div>
+      <StatusBadge tone={tone}>{state.kind === 'ready' ? 'Live' : state.kind === 'pending' ? 'Loading' : state.kind === 'error' ? 'Error' : 'Check'}</StatusBadge>
+    </div>
   )
 }
 

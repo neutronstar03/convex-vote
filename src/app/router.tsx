@@ -1,19 +1,20 @@
 import { createBrowserRouter } from 'react-router'
-import { ClaimsRoute } from '../routes/claims'
-import { HomeRoute } from '../routes/home'
-import { ProposalRoute } from '../routes/proposal'
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <HomeRoute />,
+    lazy: async () => ({ Component: (await import('../routes/home')).HomeRoute }),
   },
   {
     path: '/claims',
-    element: <ClaimsRoute />,
+    lazy: async () => ({ Component: (await import('../routes/claims')).ClaimsRoute }),
   },
   {
     path: '/proposal/:proposalId',
-    element: <ProposalRoute />,
+    lazy: async () => ({ Component: (await import('../routes/proposal')).ProposalRoute }),
+  },
+  {
+    path: '*',
+    lazy: async () => ({ Component: (await import('../routes/not-found')).NotFoundRoute }),
   },
 ])

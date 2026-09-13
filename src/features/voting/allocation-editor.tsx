@@ -104,7 +104,7 @@ export function AllocationEditor({
           <div>
             <h3 className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--pearl-aqua)]">Your ballot</h3>
             <p className="mt-1 text-xs text-[var(--fog-tint)]">
-              Add incentivized gauges directly from their cards below. Use search only for other eligible gauges.
+              Add gauges from the incentive market above, or search the full eligible catalogue for anything else.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -129,9 +129,9 @@ export function AllocationEditor({
 
         {selectedEntries.length > 0
           ? (
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 max-h-[min(45vh,18rem)] space-y-1.5 overflow-y-auto pr-1">
                 {selectedEntries.map(({ key, name, value }) => (
-                  <div key={key} className="flex items-center gap-3 rounded-md border border-[var(--steel-haze)]/60 bg-[var(--slate-machine)] px-3 py-2">
+                  <div key={key} className="flex items-center gap-3 rounded-md border border-[var(--steel-haze)]/60 bg-[var(--slate-machine)] px-3 py-1.5">
                     <span className="min-w-0 flex-1 truncate text-sm text-[var(--cloud-tint)]">{name}</span>
                     <label className="flex items-center gap-2">
                       <input
@@ -142,7 +142,7 @@ export function AllocationEditor({
                         value={value || ''}
                         onChange={event => handleAllocationChange(key, event.target.value)}
                         aria-label={`Allocation percentage for ${name}`}
-                        className="w-20 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-2 py-1.5 text-right text-sm text-[var(--cloud-tint)] outline-none"
+                        className="w-16 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-2 py-1 text-right text-sm text-[var(--cloud-tint)] outline-none"
                       />
                       <span className="text-xs text-[var(--fog-tint)]">%</span>
                     </label>
@@ -194,7 +194,7 @@ export function AllocationEditor({
             )
           : (
               <div className="mt-4 rounded-md border border-dashed border-[var(--steel-haze)] px-4 py-5 text-center text-sm text-[var(--dust-tint)]">
-                Your ballot is empty. Add a gauge from an incentive card below.
+                Your ballot is empty. Add a gauge from the incentive market above, or use the eligible-gauge search.
               </div>
             )}
 
@@ -221,6 +221,13 @@ export function AllocationEditor({
                     ? `Showing ${MAX_VISIBLE_SEARCH_RESULTS} of ${filteredChoices.length}; refine your search.`
                     : `${filteredChoices.length} eligible gauges found.`}
                 </p>
+                {visibleChoices.length === 0
+                  ? (
+                      <p className="mt-3 rounded-md border border-dashed border-[var(--steel-haze)] px-3 py-4 text-center text-xs text-[var(--dust-tint)]">
+                        No eligible gauge matches that search.
+                      </p>
+                    )
+                  : null}
                 <div className="mt-2 max-h-72 space-y-1 overflow-y-auto">
                   {visibleChoices.map(({ key, name, subtitle }) => {
                     const isSelected = selectedKeys.has(key)

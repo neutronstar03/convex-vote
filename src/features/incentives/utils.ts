@@ -8,6 +8,8 @@ function getGaugeAddressKeys(gauge: Pick<GaugeVote, 'gaugeAddress' | 'rootGaugeA
 
 export interface BribeDataAnomaly {
   severity: 'info' | 'severe'
+  currentRound: number
+  previousRound: number
   currentBribedGaugeCount: number
   previousBribedGaugeCount: number
   currentBribesUsd: number
@@ -87,7 +89,13 @@ export function getBribeDataAnomaly(
   previousEpoch: LlamaEpoch | null,
   now = Date.now(),
 ): BribeDataAnomaly | null {
-  if (proposal.state !== 'active' || !currentEpoch || !previousEpoch) {
+  if (
+    proposal.state !== 'active'
+    || !currentEpoch
+    || !previousEpoch
+    || previousEpoch.round !== currentEpoch.round - 1
+    || previousEpoch.end >= currentEpoch.end
+  ) {
     return null
   }
 
@@ -127,6 +135,8 @@ export function getBribeDataAnomaly(
 
   return {
     severity,
+    currentRound: currentEpoch.round,
+    previousRound: previousEpoch.round,
     currentBribedGaugeCount,
     previousBribedGaugeCount,
     currentBribesUsd,
@@ -134,7 +144,7 @@ export function getBribeDataAnomaly(
     gaugeCountDrop,
     bribesUsdDrop,
     roundProgress,
-    tooltip: `${currentBribedGaugeCount} bribed gauges vs ${previousBribedGaugeCount} last round. Active-round incentive data may still be updating.`,
+    tooltip: `Llama reports ${currentBribedGaugeCount} incentivized gauges in active Votium round ${currentEpoch.round}, versus ${previousBribedGaugeCount} in completed round ${previousEpoch.round}. Active-round incentive data can change.`,
   }
 }
 

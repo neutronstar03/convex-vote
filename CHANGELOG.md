@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.0 - 2026-09-13
+
+- introduced semantic visual tokens and reusable UI primitives while preserving the existing graphite, aqua, and magenta identity
+- consolidated repeated dashboard and proposal metrics into clearer, denser information hierarchies
+- replaced oversized incentive cards with compact comparison rows on desktop and purposeful card reflow on mobile
+- added active navigation, independent Convex and Llama source health, freshness timestamps, countdowns, and explicit loading/error/empty states
+- clarified wallet, ballot, vote submission, and claim transaction feedback without changing on-chain behavior
+- separated pending, rejected, reverted, receipt-error, and confirmed claim states so failures cannot appear successful
+- split the proposal interface into focused market, wallet, ballot, formatting, and shared-status modules
+- added accessibility, incentive-source, allocation-editor, proposal-state, and claim-receipt regression coverage
+
 ## v1.0.12 - 2026-08-04
 
 - stacked footer metadata and navigation cleanly on mobile widths

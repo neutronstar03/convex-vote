@@ -6,6 +6,7 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.1.0: redesigned the interface hierarchy, compacted gauge comparison, added explicit source and transaction feedback, and split the proposal UI into maintainable modules
 - v1.0.12: fixed cramped footer wrapping on mobile widths
 - v1.0.11: added a resilient between-round state when Convex has no active proposal
 - v1.0.10: added direct gauge-card voting with a synchronized ballot and identifier search
@@ -81,6 +82,12 @@ Then open:
 - Wagmi / RainbowKit
 - Convex current-proposal API and gauge voting contracts
 - Votium incentive data via Llama Airforce
+
+## Data provenance
+
+- Convex's current-proposal API is authoritative for the active voting window, gauge catalogue, vote totals, and voter count.
+- Llama Airforce supplies Votium incentive rows. An "incentivized gauge" is a distinct gauge address present in that round's Llama bribe rows, including gauges that have not received a vote yet.
+- Active-round incentive data is mutable. The warning compares the exact active Votium round with its immediately preceding completed round only after the configured early-round grace period; it does not imply that Convex vote data is stale.
 
 ## License
 
