@@ -6,6 +6,8 @@ Convex gauge voting is too important to be hidden behind awkward workflows and h
 
 ## Recent updates
 
+- v1.1.1: readable mobile ballots, session drafts that survive closing the editor, and working wallet connection from ballot actions
+
 - v1.1.0: redesigned the interface hierarchy, compacted gauge comparison, added explicit source and transaction feedback, and split the proposal UI into maintainable modules
 - v1.0.12: fixed cramped footer wrapping on mobile widths
 - v1.0.11: added a resilient between-round state when Convex has no active proposal

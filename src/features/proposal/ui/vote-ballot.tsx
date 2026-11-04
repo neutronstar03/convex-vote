@@ -14,6 +14,7 @@ export interface BallotEditorState {
   onClose: () => void
   onAllocationsChange: (allocations: Record<string, number>) => void
   onSubmit: (allocations: Record<string, number>) => void
+  onConnect: () => void
 }
 
 export interface BallotSubmissionState {
@@ -61,7 +62,7 @@ export function BallotPanel({
   const reviewTotal = review.allocations ? Object.values(review.allocations).reduce((total, value) => total + value, 0) : 0
 
   return (
-    <Panel id="vote-ballot" className="scroll-mt-4 p-4 sm:p-5">
+    <Panel id="vote-ballot" className="scroll-mt-32 p-4 sm:scroll-mt-24 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Eyebrow>Cast your vote</Eyebrow>
@@ -75,7 +76,7 @@ export function BallotPanel({
         {!editor.isOpen
           ? (
               <button type="button" onClick={editor.onOpen} className={SECONDARY_ACTION_CLASS}>
-                {voted ? 'Edit vote' : 'Start voting'}
+                {Object.keys(editor.allocations).length > 0 ? 'Resume ballot' : voted ? 'Edit vote' : 'Start voting'}
               </button>
             )
           : null}
@@ -105,6 +106,8 @@ export function BallotPanel({
                 choices={proposal.gauges.map(gauge => ({
                   key: gauge.key,
                   name: gauge.label,
+                  chain: capitalize(gauge.blockchainId),
+                  gaugeAddress: gauge.gaugeAddress,
                   subtitle: `${capitalize(gauge.blockchainId)} · Gauge ${shortAddress(gauge.gaugeAddress)} · Root ${shortAddress(gauge.rootGaugeAddress)}`,
                   searchText: [
                     gauge.gaugeAddress,
@@ -122,6 +125,7 @@ export function BallotPanel({
                 isRevote={voted}
                 onChange={editor.onAllocationsChange}
                 onSubmit={editor.onSubmit}
+                onConnect={editor.onConnect}
                 isSubmitting={isSubmitting}
               />
               <button
@@ -180,6 +184,7 @@ export function BallotPanel({
         : null}
 
       <ReviewModal
+        choiceDetails={Object.fromEntries(proposal.gauges.map(gauge => [gauge.key, `${capitalize(gauge.blockchainId)} · Gauge ${gauge.gaugeAddress}`]))}
         allocations={review.allocations ?? {}}
         choiceNames={choiceNames}
         total={reviewTotal}
@@ -203,6 +208,7 @@ export interface BallotSummaryBarProps {
   hasWallet: boolean
   onEqualize: () => void
   onReview: () => void
+  onConnect: () => void
 }
 
 /** Sticky draft-total bar shown while the ballot holds at least one gauge. */
@@ -214,12 +220,13 @@ export function BallotSummaryBar({
   hasWallet,
   onEqualize,
   onReview,
+  onConnect,
 }: BallotSummaryBarProps) {
   return (
     <>
-      <div className="h-16" aria-hidden="true" />
-      <div className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--color-positive)]/40 bg-[var(--color-surface-inset)]/97 px-4 py-3 shadow-2xl backdrop-blur sm:inset-x-6">
-        <div>
+      <div className="h-28 sm:h-24" aria-hidden="true" />
+      <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 min-[360px]:flex-nowrap rounded-lg border border-[var(--color-positive)]/40 bg-[var(--color-surface-inset)]/97 px-3 py-2 shadow-2xl sm:px-4 sm:py-3 backdrop-blur sm:inset-x-6">
+        <div className="flex w-full items-center justify-between gap-2 min-[360px]:block min-[360px]:w-auto">
           <p className="text-sm font-semibold text-[var(--color-text)]">
             {gaugeCount}
             {' '}
@@ -231,33 +238,34 @@ export function BallotSummaryBar({
             {total.toFixed(1)}
             %
             {isValid
-              ? ' · Ready to review'
+              ? hasWallet ? ' · Ready to review' : ' · Allocation valid'
               : hasEmptyWeight
                 ? ' · Set every selected gauge above 0%'
                 : ' · Must equal 100%'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full shrink-0 items-center justify-end gap-2 min-[360px]:w-auto">
           <button
             type="button"
             onClick={onEqualize}
-            className="ui-interactive rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)]"
+            className="ui-interactive hidden rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)] sm:block"
           >
             Equal split
           </button>
           <a
             href="#vote-ballot"
-            className="ui-interactive rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)]"
+            className="ui-interactive rounded-lg border border-[var(--color-border)] px-2 py-2 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)] sm:px-3 sm:text-sm"
           >
-            View ballot
+            Edit
           </a>
           <button
             type="button"
-            disabled={!isValid || !hasWallet}
-            onClick={onReview}
+            disabled={hasWallet && !isValid}
+            onClick={hasWallet ? onReview : onConnect}
+            aria-label={hasWallet ? 'Review vote' : 'Connect wallet to review'}
             className={PRIMARY_ACTION_CLASS}
           >
-            {hasWallet ? 'Review vote' : 'Connect wallet to review'}
+            {hasWallet ? 'Review vote' : 'Connect wallet'}
           </button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { AllocationEditor } from '../src/features/voting/allocation-editor'
 function noop() {}
 
 const choices = [
-  { key: '0xaaa', name: 'AQUA+crvUSD', subtitle: 'Ethereum · Gauge 0x11…11' },
+  { key: '0xaaa', name: 'AQUA+crvUSD', subtitle: 'Ethereum · Gauge 0x11…11', chain: 'Ethereum', gaugeAddress: '0x1111111111111111111111111111111111111111' },
   { key: '0xbbb', name: 'BOLD+USDC' },
 ]
 
@@ -20,6 +20,7 @@ function renderEditor(overrides: Partial<Parameters<typeof AllocationEditor>[0]>
       isRevote={false}
       onChange={noop}
       onSubmit={noop}
+      onConnect={noop}
       isSubmitting={false}
       {...overrides}
     />,
@@ -32,6 +33,8 @@ describe('AllocationEditor', () => {
 
     expect(markup).toContain('Your ballot')
     expect(markup).toContain('AQUA+crvUSD')
+    expect(markup).toContain('Ethereum')
+    expect(markup).toContain('0x1111111111111111111111111111111111111111')
     expect(markup).toContain('BOLD+USDC')
     expect(markup).toContain('100.0')
     expect(markup).toContain('Review vote')
@@ -49,7 +52,9 @@ describe('AllocationEditor', () => {
   it('asks for a wallet connection only when the ballot needs to be signed', () => {
     const markup = renderEditor({ isConnected: false })
 
-    expect(markup).toContain('Connect your wallet to vote.')
+    expect(markup).toContain('Allocation valid. Connect your wallet to review it.')
+    expect(markup).toContain('Connect wallet to review')
+    expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Connect wallet to review/)
   })
 
   it('points an empty ballot at the incentive market above', () => {

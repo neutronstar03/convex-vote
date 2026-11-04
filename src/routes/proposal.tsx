@@ -1,7 +1,8 @@
 import type { SortKey } from '../features/proposal/ui/gauge-market'
 import type { IncentiveSourceState } from '../features/proposal/ui/incentive-market'
+import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
@@ -18,6 +19,7 @@ import { DataFreshness, RoundCountdown, StatusNote, Tag } from '../features/prop
 import { INLINE_BUTTON_CLASS, PRIMARY_ACTION_CLASS, SECONDARY_ACTION_CLASS, TERTIARY_LINK_CLASS } from '../features/proposal/ui/styles'
 import { BallotPanel, BallotSummaryBar } from '../features/proposal/ui/vote-ballot'
 import { getWalletVoteRecap, WalletPositionPanel } from '../features/proposal/ui/wallet-position'
+import { useBallotDraft } from '../features/voting/use-ballot-draft'
 import { useConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { useSubmitVote } from '../features/voting/use-submit-vote'
 import { cn } from '../lib/cn'
@@ -33,6 +35,7 @@ const CONVEX_GOVERNANCE_URL = 'https://www.convexfinance.com/vote/weights/curve'
 export function ProposalRoute() {
   const { proposalId } = useParams()
   const { address } = useAccount()
+  const { openConnectModal } = useConnectModal()
   const [searchParams] = useSearchParams()
   const [sortKey, setSortKey] = useState<SortKey>('incentives')
   const [searchTerm, setSearchTerm] = useState('')
@@ -40,7 +43,6 @@ export function ProposalRoute() {
   const [showOnlyWalletVotes, setShowOnlyWalletVotes] = useState(false)
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null)
   const [showVoteEditor, setShowVoteEditor] = useState(false)
-  const [draftAllocations, setDraftAllocations] = useState<Record<string, number>>({})
   const [reviewAllocations, setReviewAllocations] = useState<Record<string, number> | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const submitVoteMutation = useSubmitVote()
@@ -54,6 +56,16 @@ export function ProposalRoute() {
   const isWatchMode = Boolean(watchedAddress)
   const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
   const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
+  const { allocations: draftAllocations, setAllocations: setDraftAllocations, initialize: initializeDraft, reset: resetDraft } = useBallotDraft(
+    proposal?.id,
+    address,
+    voteQuery.data?.voted ? voteQuery.data.allocationPercentages : {},
+  )
+  const connectWallet = () => openConnectModal?.()
+  useEffect(() => {
+    setIsReviewOpen(false)
+    setReviewAllocations(null)
+  }, [address, proposal?.id])
   const timeZone = getCurrentTimeZone()
   const epoch = epochQuery.data ?? null
   const previousEpoch = previousEpochQuery.data ?? null
@@ -235,13 +247,8 @@ export function ProposalRoute() {
     }
   }
 
-  const getExistingAllocations = () => voteQuery.data?.voted
-    ? { ...voteQuery.data.allocationPercentages }
-    : {}
-
   const openBallot = () => {
-    if (!showVoteEditor)
-      setDraftAllocations(getExistingAllocations())
+    initializeDraft()
     setShowVoteEditor(true)
   }
 
@@ -254,7 +261,7 @@ export function ProposalRoute() {
 
   const addGaugeToBallot = (gaugeKey: string) => {
     setDraftAllocations((current) => {
-      const next = showVoteEditor ? { ...current } : getExistingAllocations()
+      const next = { ...current }
       if (!Object.hasOwn(next, gaugeKey))
         next[gaugeKey] = Object.keys(next).length === 0 ? 100 : 0
       return next
@@ -313,7 +320,7 @@ export function ProposalRoute() {
         onSuccess: () => {
           setIsReviewOpen(false)
           setReviewAllocations(null)
-          setDraftAllocations({})
+          resetDraft()
           setShowVoteEditor(false)
         },
         onError: () => {
@@ -493,6 +500,7 @@ export function ProposalRoute() {
                 isOpen: showVoteEditor,
                 allocations: draftAllocations,
                 onOpen: openBallot,
+                onConnect: connectWallet,
                 onClose: () => setShowVoteEditor(false),
                 onAllocationsChange: setDraftAllocations,
                 onSubmit: (allocations) => {
@@ -528,6 +536,7 @@ export function ProposalRoute() {
               hasWallet={Boolean(address)}
               onEqualize={equalizeDraftAllocations}
               onReview={openReviewForDraft}
+              onConnect={connectWallet}
             />
           )
         : null}

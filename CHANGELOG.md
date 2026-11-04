@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.1 - 2026-11-04
+
+- show full pool names, chains, and gauge addresses in the ballot and vote review
+- keep ballot drafts when the editor closes, with a separate Discard draft action
+- carry a prepared ballot into wallet connection and keep drafts separate across rounds and accounts
+- open wallet connection from ballot actions and distinguish a valid allocation from a wallet ready to review
+- compact mobile navigation and the ballot bar, with room for fixed controls and correctly positioned ballot links
+
 ## v1.1.0 - 2026-09-13
 
 - introduced semantic visual tokens and reusable UI primitives while preserving the existing graphite, aqua, and magenta identity

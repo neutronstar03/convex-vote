@@ -4,6 +4,7 @@ import { formatNumber } from '../../lib/format'
 interface ReviewModalProps {
   allocations: Record<string, number>
   choiceNames: Record<string, string>
+  choiceDetails?: Record<string, string>
   total: number
   votingPower?: number
   isRevote: boolean
@@ -17,6 +18,7 @@ interface ReviewModalProps {
 export function ReviewModal({
   allocations,
   choiceNames,
+  choiceDetails,
   total,
   votingPower,
   isRevote,
@@ -113,9 +115,10 @@ export function ReviewModal({
         <div className="mt-4 max-h-[min(50vh,20rem)] space-y-1 overflow-y-auto pr-1">
           {entries.map(([key, weight]) => (
             <div key={key} className="flex items-center justify-between rounded-md bg-[var(--carbon-ink)] px-3 py-2 text-sm">
-              <span className="min-w-0 flex-1 truncate text-[var(--cloud-tint)]">
-                {choiceNames[key] ?? key}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-[var(--cloud-tint)] [overflow-wrap:anywhere]">{choiceNames[key] ?? key}</p>
+                {choiceDetails?.[key] ? <p className="mt-1 break-all text-[11px] text-[var(--dust-tint)]">{choiceDetails[key]}</p> : null}
+              </div>
               <span className="ml-3 font-semibold text-[var(--pearl-aqua)]">
                 {weight.toFixed(1)}
                 %

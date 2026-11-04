@@ -20,7 +20,7 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--color-page)] text-[var(--color-text)]" data-testid="app-shell">
       <header className="sticky top-0 z-20 border-b border-[var(--color-border-subtle)] bg-[color:rgba(36,40,43,0.94)] backdrop-blur" data-testid="navbar">
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-2 px-4 py-3 sm:flex sm:justify-between sm:gap-4 sm:px-5">
+        <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-2 sm:py-3 sm:flex sm:justify-between sm:gap-4 sm:px-5">
           <div className="min-w-0" data-testid="navbar-brand">
             <Link to="/" className="inline-flex items-center gap-2 text-base font-semibold tracking-tight text-[var(--color-text)] sm:text-lg" data-testid="navbar-home-link">
               <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-info)] shadow-[0_0_12px_rgba(120,218,228,0.75)]" aria-hidden="true" />
@@ -31,7 +31,7 @@ export function AppShell({ children }: PropsWithChildren) {
             </p>
           </div>
 
-          <nav className="flex w-full items-center justify-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-inset)] p-1 sm:w-auto" aria-label="Primary navigation">
+          <nav className="col-span-2 row-start-2 flex w-full items-center justify-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-inset)] p-1 sm:w-auto" aria-label="Primary navigation">
             <NavLink to="/" active={location.pathname === '/'}>
               Dashboard
             </NavLink>
@@ -40,7 +40,7 @@ export function AppShell({ children }: PropsWithChildren) {
             </NavLink>
           </nav>
 
-          <div className="justify-self-end sm:justify-self-auto" data-testid="rainbowkit-connect-button">
+          <div className="col-start-2 row-start-1 justify-self-end sm:justify-self-auto" data-testid="rainbowkit-connect-button">
             <ConnectButton showBalance={false} chainStatus="icon" />
           </div>
         </div>
@@ -61,7 +61,7 @@ function NavLink({ to, active, children }: { to: string, active: boolean, childr
       to={to}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'rounded-md px-3 py-1.5 text-sm sm:py-2 font-medium transition-colors',
         active
           ? 'bg-[var(--color-surface-raised)] text-[var(--color-text)] shadow-sm'
           : 'text-[var(--color-text-subtle)] hover:text-[var(--color-text)]',

@@ -6,6 +6,8 @@ export interface AllocationChoice {
   name: string
   searchText?: string
   subtitle?: string
+  chain?: string
+  gaugeAddress?: string
 }
 
 interface AllocationEditorProps {
@@ -17,6 +19,7 @@ interface AllocationEditorProps {
   isRevote: boolean
   onChange: (allocations: Record<string, number>) => void
   onSubmit: (allocations: Record<string, number>) => void
+  onConnect: () => void
   isSubmitting: boolean
 }
 
@@ -31,11 +34,12 @@ export function AllocationEditor({
   isRevote,
   onChange,
   onSubmit,
+  onConnect,
   isSubmitting,
 }: AllocationEditorProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isGaugeSearchOpen, setIsGaugeSearchOpen] = useState(false)
-  const choiceNames = useMemo(() => new Map(choices.map(choice => [choice.key, choice.name])), [choices])
+  const choicesByKey = useMemo(() => new Map(choices.map(choice => [choice.key, choice])), [choices])
   const selectedKeys = useMemo(() => new Set(Object.keys(allocations)), [allocations])
 
   const filteredChoices = useMemo(() => {
@@ -54,12 +58,12 @@ export function AllocationEditor({
     [allocations],
   )
   const validationError = useMemo(
-    () => validateAllocation({ isConnected, proposalActive, votingPower, allocations }),
-    [allocations, isConnected, proposalActive, votingPower],
+    () => validateAllocation({ isConnected: true, proposalActive, votingPower, allocations }),
+    [allocations, proposalActive, votingPower],
   )
   const isWithinTolerance = total >= 99.9 && total <= 100.1
   const selectedEntries = Object.entries(allocations)
-    .map(([key, value]) => ({ key, name: choiceNames.get(key) ?? key, value }))
+    .map(([key, value]) => ({ key, name: choicesByKey.get(key)?.name ?? key, choice: choicesByKey.get(key), value }))
     .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
   const handleToggleGauge = useCallback((key: string) => {
@@ -122,7 +126,7 @@ export function AllocationEditor({
               disabled={selectedEntries.length === 0}
               className="rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/45 px-3 py-1.5 text-xs text-[var(--dust-tint)] transition hover:bg-[var(--gunmetal-mist)] disabled:opacity-40"
             >
-              Clear ballot
+              Discard draft
             </button>
           </div>
         </div>
@@ -130,29 +134,45 @@ export function AllocationEditor({
         {selectedEntries.length > 0
           ? (
               <div className="mt-4 max-h-[min(45vh,18rem)] space-y-1.5 overflow-y-auto pr-1">
-                {selectedEntries.map(({ key, name, value }) => (
-                  <div key={key} className="flex items-center gap-3 rounded-md border border-[var(--steel-haze)]/60 bg-[var(--slate-machine)] px-3 py-1.5">
-                    <span className="min-w-0 flex-1 truncate text-sm text-[var(--cloud-tint)]">{name}</span>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={value || ''}
-                        onChange={event => handleAllocationChange(key, event.target.value)}
-                        aria-label={`Allocation percentage for ${name}`}
-                        className="w-16 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-2 py-1 text-right text-sm text-[var(--cloud-tint)] outline-none"
-                      />
-                      <span className="text-xs text-[var(--fog-tint)]">%</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleGauge(key)}
-                      className="rounded-md px-2 py-1 text-xs text-[var(--fog-tint)] hover:bg-[var(--gunmetal-mist)] hover:text-[var(--hot-fuchsia)]"
-                    >
-                      Remove
-                    </button>
+                {selectedEntries.map(({ key, name, choice, value }) => (
+                  <div key={key} className="rounded-md border border-[var(--steel-haze)]/60 bg-[var(--slate-machine)] px-3 py-3 sm:flex sm:items-center sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-medium text-[var(--cloud-tint)] [overflow-wrap:anywhere]">{name}</p>
+                      {choice?.chain ? <p className="mt-1 text-xs text-[var(--dust-tint)]">{choice.chain}</p> : null}
+                      {choice?.gaugeAddress
+                        ? (
+                            <p className="mt-1 break-all font-mono text-[11px] leading-4 text-[var(--dust-tint)]">
+                              Gauge
+                              {' '}
+                              {choice.gaugeAddress}
+                            </p>
+                          )
+                        : choice?.subtitle ? <p className="mt-1 break-words text-xs text-[var(--dust-tint)]">{choice.subtitle}</p> : null}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 sm:mt-0 sm:shrink-0">
+                      <label className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--dust-tint)]">Weight</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={value || ''}
+                          onChange={event => handleAllocationChange(key, event.target.value)}
+                          aria-label={`Allocation percentage for ${name}`}
+                          className="w-20 rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-2 py-1 text-right text-sm text-[var(--cloud-tint)] outline-none"
+                        />
+                        <span className="text-xs text-[var(--fog-tint)]">%</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleGauge(key)}
+                        aria-label={`Remove ${name} from ballot`}
+                        className="rounded-md px-2 py-1 text-xs text-[var(--fog-tint)] hover:bg-[var(--gunmetal-mist)] hover:text-[var(--hot-fuchsia)]"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
 
@@ -178,17 +198,19 @@ export function AllocationEditor({
                   </div>
                 </div>
 
+                {!validationError && !isConnected ? <p className="text-xs text-[var(--dust-tint)]">Allocation valid. Connect your wallet to review it.</p> : null}
+
                 {validationError
                   ? <p className="text-sm text-[var(--hot-fuchsia)]">{validationError.message}</p>
                   : null}
 
                 <button
                   type="button"
-                  onClick={() => onSubmit({ ...allocations })}
-                  disabled={Boolean(validationError) || !isWithinTolerance || isSubmitting}
+                  onClick={() => isConnected ? onSubmit({ ...allocations }) : onConnect()}
+                  disabled={isSubmitting || (isConnected && (Boolean(validationError) || !isWithinTolerance))}
                   className="w-full rounded-md bg-[var(--hyper-magenta)] px-4 py-2.5 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100"
                 >
-                  {isSubmitting ? 'Submitting…' : isRevote ? 'Review updated vote' : 'Review vote'}
+                  {isSubmitting ? 'Submitting…' : !isConnected ? 'Connect wallet to review' : isRevote ? 'Review updated vote' : 'Review vote'}
                 </button>
               </div>
             )
