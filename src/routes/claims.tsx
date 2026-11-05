@@ -1,16 +1,21 @@
-import type { ReactNode } from 'react'
+import type { PropsWithChildren, ReactNode } from 'react'
 import type { ClaimableToken } from '../features/claim/types'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
+import { WatchAddressPanel } from '../components/shared/watch-address'
 import { useClaimableTokens, useIsClaimedBatch } from '../features/claim/queries'
 import { useClaimTokens } from '../features/claim/use-claim-tokens'
 import { partitionClaimsByStatus } from '../features/claim/utils'
 import { formatNumber } from '../lib/format'
+import { resolveWatchAddress } from '../lib/watch-address'
 
 export function ClaimsRoute() {
   const { address, isConnected } = useAccount()
-  const claimsQuery = useClaimableTokens(address)
+  const [params] = useSearchParams()
+  const { activeAddress, isWatchMode, isInvalid } = resolveWatchAddress(params, address)
+  const claimsQuery = useClaimableTokens(activeAddress)
   const rawClaims = claimsQuery.data ?? []
   const {
     enrichedClaims,
@@ -29,23 +34,23 @@ export function ClaimsRoute() {
   const totalAvailable = unclaimedClaims.length
   const isCheckingClaimStatus = isClaimedLoading || isClaimedFetching
 
-  if (!isConnected) {
+  if (isInvalid || !activeAddress) {
     return (
-      <AppShell>
+      <ClaimsShell>
         <section className="ui-panel mx-auto w-full max-w-2xl p-6 text-center sm:p-8">
           <p className="ui-eyebrow">Votium bribes</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--cloud-tint)]">Connect your wallet</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--cloud-tint)]">{isInvalid ? 'Invalid watch address' : 'Check Votium rewards'}</h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
-            Connect the wallet that received the bribe allocation to check its claim status.
+            Paste a wallet address above to check rewards without connecting, or connect your wallet.
           </p>
         </section>
-      </AppShell>
+      </ClaimsShell>
     )
   }
 
   if (claimsQuery.isPending) {
     return (
-      <AppShell>
+      <ClaimsShell>
         <section className="ui-panel p-6 sm:p-8" role="status" aria-live="polite" aria-label="Loading claim data">
           <div className="flex items-center gap-3">
             <div className="size-5 animate-spin rounded-full border-2 border-[var(--pearl-aqua)] border-t-transparent" aria-hidden="true" />
@@ -55,13 +60,13 @@ export function ClaimsRoute() {
             </div>
           </div>
         </section>
-      </AppShell>
+      </ClaimsShell>
     )
   }
 
   if (claimsQuery.isError) {
     return (
-      <AppShell>
+      <ClaimsShell>
         <section className="rounded-lg border border-[var(--hot-fuchsia)]/40 bg-[color:rgba(255,22,84,0.1)] p-6 sm:p-8" role="alert">
           <p className="text-lg font-semibold text-[var(--cloud-tint)]">Couldn’t load claim data</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">{claimsQuery.error.message}</p>
@@ -73,32 +78,32 @@ export function ClaimsRoute() {
             Retry
           </button>
         </section>
-      </AppShell>
+      </ClaimsShell>
     )
   }
 
   if (claims.length === 0) {
     return (
-      <AppShell>
+      <ClaimsShell>
         <section className="ui-panel mx-auto w-full max-w-2xl p-6 text-center sm:p-8">
           <p className="ui-eyebrow">Votium bribes</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--cloud-tint)]">No claim records found</h1>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[var(--color-text-muted)]">
-            This wallet has no entries in the live Votium claim registry. If you expected a bribe, check the connected account and try again later.
+            This wallet has no entries in the live Votium claim registry. If you expected a bribe, check the selected address and try again later.
           </p>
         </section>
-      </AppShell>
+      </ClaimsShell>
     )
   }
 
   return (
-    <AppShell>
+    <ClaimsShell>
       <div className="space-y-4">
         <section className="ui-panel p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
               <p className="ui-eyebrow">Votium bribes</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--cloud-tint)] sm:text-3xl">Claim available bribes</h1>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--cloud-tint)] sm:text-3xl">{isWatchMode ? 'Watched Votium rewards' : 'Claim available bribes'}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
                 Live registry entries are checked against the onchain stash before they can be submitted.
               </p>
@@ -130,7 +135,7 @@ export function ClaimsRoute() {
         {totalAvailable > 0 && (
           <TokenSection
             title="Available to claim"
-            subtitle="Verified unclaimed balances ready for one transaction."
+            subtitle={isWatchMode ? 'Verified unclaimed balances. Return to your connected wallet to claim.' : 'Verified unclaimed balances ready for one transaction.'}
             claims={claimableTokens}
             tone="available"
           />
@@ -168,8 +173,9 @@ export function ClaimsRoute() {
           />
         )}
 
-        {totalAvailable > 0 && !isCheckingClaimStatus && (
+        {totalAvailable > 0 && !isCheckingClaimStatus && !isWatchMode && isConnected && (
           <ClaimAllBar
+            key={address}
             address={address!}
             claimableTokens={claimableTokens}
             onClaimSuccess={async () => {
@@ -182,6 +188,15 @@ export function ClaimsRoute() {
         )}
 
       </div>
+    </ClaimsShell>
+  )
+}
+
+function ClaimsShell({ children }: PropsWithChildren) {
+  return (
+    <AppShell>
+      <WatchAddressPanel />
+      {children}
     </AppShell>
   )
 }

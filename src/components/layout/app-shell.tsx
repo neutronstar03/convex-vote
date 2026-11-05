@@ -1,13 +1,15 @@
 import type { PropsWithChildren } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useEffect } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { initClickTracking, trackPageview } from '../../lib/analytics'
 import { cn } from '../../lib/cn'
 import { Footer } from './footer'
 
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation()
+  const [params] = useSearchParams()
+  const watchSuffix = params.has('watch') ? `?${new URLSearchParams({ watch: params.get('watch') ?? '' })}` : ''
 
   useEffect(() => {
     trackPageview(location.pathname + location.search)
@@ -32,10 +34,10 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
 
           <nav className="col-span-2 row-start-2 flex w-full items-center justify-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-inset)] p-1 sm:w-auto" aria-label="Primary navigation">
-            <NavLink to="/" active={location.pathname === '/'}>
+            <NavLink to={`/${watchSuffix}`} active={location.pathname === '/'}>
               Dashboard
             </NavLink>
-            <NavLink to="/claims" active={location.pathname.startsWith('/claims')}>
+            <NavLink to={`/claims${watchSuffix}`} active={location.pathname.startsWith('/claims')}>
               Claims
             </NavLink>
           </nav>
