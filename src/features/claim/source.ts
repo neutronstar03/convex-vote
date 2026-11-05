@@ -3,10 +3,24 @@ import type { ActiveToken, ClaimableToken, ClaimableTokenPayload, FirebaseClaimE
 export const VOTIUM_FIREBASE_DATABASE_URL = 'https://test-54f45-default-rtdb.firebaseio.com' as const
 export const VOTIUM_GITHUB_RAW = 'https://raw.githubusercontent.com/oo-00/Votium/main/merkle' as const
 
+const WALLET_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
+
 type FetchLike = typeof fetch
+
+export class InvalidWalletAddressError extends Error {
+  constructor() {
+    super('Invalid wallet address')
+    this.name = 'InvalidWalletAddressError'
+  }
+}
 
 function getAddressCandidates(address: string): `0x${string}`[] {
   const trimmed = address.trim()
+  // Validate syntax only: keep lowercase and non-checksummed mixed-case lookups supported.
+  if (!WALLET_ADDRESS_PATTERN.test(trimmed)) {
+    throw new InvalidWalletAddressError()
+  }
+
   const candidates = [trimmed, trimmed.toLowerCase()]
   return [...new Set(candidates)] as `0x${string}`[]
 }

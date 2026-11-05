@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { findClaimsForVoter, serializeClaimableToken } from '../../../../src/features/claim/source'
+import { findClaimsForVoter, InvalidWalletAddressError, serializeClaimableToken } from '../../../../src/features/claim/source'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -32,6 +32,10 @@ export const onRequestGet: PagesFunction = async (context) => {
     })
   }
   catch (error) {
+    if (error instanceof InvalidWalletAddressError) {
+      return jsonResponse({ error: error.message }, 400)
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Votium claims error:', error)
     return jsonResponse({ error: `Votium claim proxy error: ${message}` }, 502)
