@@ -1,4 +1,3 @@
-import type { SortKey } from '../features/proposal/ui/gauge-market'
 import type { IncentiveSourceState } from '../features/proposal/ui/incentive-market'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react'
@@ -11,6 +10,7 @@ import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
 import { Eyebrow, Panel } from '../components/ui/primitives'
 import { useEpochForRound, usePreviousEpoch } from '../features/incentives/queries'
 import { getBribeDataAnomaly, mergeProposalAndEpoch } from '../features/incentives/utils'
+import { readMarketState, updateMarketState } from '../features/proposal/market-state'
 import { useResolvedProposal } from '../features/proposal/queries'
 import { capitalize, shortAddress, summarizeRewardTokens } from '../features/proposal/ui/format'
 import { compareRows } from '../features/proposal/ui/gauge-market'
@@ -36,11 +36,9 @@ export function ProposalRoute() {
   const { proposalId } = useParams()
   const { address } = useAccount()
   const { openConnectModal } = useConnectModal()
-  const [searchParams] = useSearchParams()
-  const [sortKey, setSortKey] = useState<SortKey>('incentives')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [rewardTokenFilter, setRewardTokenFilter] = useState('all')
-  const [showOnlyWalletVotes, setShowOnlyWalletVotes] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { sortKey, searchTerm, rewardTokenFilter, showOnlyWalletVotes } = readMarketState(searchParams)
+  const updateFilters = (updates: Record<string, string | null>) => setSearchParams(current => updateMarketState(current, updates), { replace: true })
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null)
   const [showVoteEditor, setShowVoteEditor] = useState(false)
   const [reviewAllocations, setReviewAllocations] = useState<Record<string, number> | null>(null)
@@ -220,7 +218,7 @@ export function ProposalRoute() {
         : 'unmatched'
   const isRefreshing = proposalQuery.isFetching || epochQuery.isFetching
   const rewardTokenSummary = summarizeRewardTokens(bribedRows)
-  const isFiltered = searchTerm.trim().length > 0 || rewardTokenFilter !== 'all' || showOnlyWalletVotes
+  const isFiltered = searchTerm.trim().length > 0 || rewardTokenFilter !== 'all' || showOnlyWalletVotes || sortKey !== 'incentives'
   const marketSummary = incentiveState === 'ready'
     ? [
         `${formatNumber(bribedRows.length, 0)} of ${formatNumber(resolvedProposal.gauges.length, 0)} eligible gauges carry active Llama incentives`,
@@ -294,9 +292,7 @@ export function ProposalRoute() {
   }
 
   const resetFilters = () => {
-    setSearchTerm('')
-    setRewardTokenFilter('all')
-    setShowOnlyWalletVotes(false)
+    updateFilters({ search: null, token: null, walletOnly: null, sort: null })
   }
 
   const openReviewForDraft = () => {
@@ -451,14 +447,14 @@ export function ProposalRoute() {
         copiedLabel={copiedLabel}
         filters={{
           searchTerm,
-          onSearchTermChange: setSearchTerm,
+          onSearchTermChange: value => updateFilters({ search: value }),
           rewardTokenFilter,
-          rewardTokenOptions,
-          onRewardTokenFilterChange: setRewardTokenFilter,
+          rewardTokenOptions: rewardTokenOptions.includes(rewardTokenFilter) ? rewardTokenOptions : [...rewardTokenOptions, rewardTokenFilter],
+          onRewardTokenFilterChange: value => updateFilters({ token: value === 'all' ? null : value }),
           sortKey,
-          onSortKeyChange: setSortKey,
+          onSortKeyChange: value => updateFilters({ sort: value === 'incentives' ? null : value }),
           showOnlyWalletVotes,
-          onShowOnlyWalletVotesChange: setShowOnlyWalletVotes,
+          onShowOnlyWalletVotesChange: value => updateFilters({ walletOnly: value ? '1' : null }),
           canFilterWalletVotes: walletChoiceKeys.size > 0,
           isFiltered,
           onReset: resetFilters,

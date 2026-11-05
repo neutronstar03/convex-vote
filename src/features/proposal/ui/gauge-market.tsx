@@ -15,6 +15,8 @@ export const SORT_OPTIONS: Array<{ value: SortKey, label: string }> = [
   { value: 'voteShare', label: 'Vote share' },
 ]
 
+const HTTP_URL_PATTERN = /^https?:\/\//i
+
 export const MAX_ROW_TOKENS = 3
 
 /* Shared column widths keep the list header aligned with every gauge row. */
@@ -92,18 +94,13 @@ export function MarketFilters({
           ))}
         </select>
       </label>
-      <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-        Sort
-        <select
-          value={sortKey}
-          onChange={event => onSortKeyChange(event.target.value as SortKey)}
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-2 py-2 text-sm text-[var(--color-text)] outline-none"
-        >
-          {SORT_OPTIONS.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </label>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Sort gauges">
+        {SORT_OPTIONS.map(option => (
+          <button key={option.value} type="button" aria-pressed={sortKey === option.value} onClick={() => onSortKeyChange(option.value)} className={cn('ui-interactive rounded-full border px-3 py-2 text-xs', sortKey === option.value ? 'border-[var(--color-action)] bg-[var(--color-action)]/20 text-[var(--color-text)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)]')}>
+            {option.label}
+          </button>
+        ))}
+      </div>
       {canFilterWalletVotes
         ? (
             <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
@@ -171,6 +168,7 @@ export function GaugeRow({
   onCopy,
 }: GaugeRowProps) {
   const gaugeCopyLabel = `the gauge address for ${row.label}`
+  const poolUrl = row.poolUrls.find(url => HTTP_URL_PATTERN.test(url))
   const poolCopyLabel = `the pool name ${row.label}`
 
   return (
@@ -224,6 +222,32 @@ export function GaugeRow({
                 </>
               )
             : <span className="text-[11px] text-[var(--color-text-faint)]">No reward tokens detected</span>}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--color-info)]">
+          {poolUrl && <a href={poolUrl} target="_blank" rel="noreferrer">Open pool ↗</a>}
+          {row.bribeTokens.length > 0 && (
+            <details className="text-[var(--color-text-muted)]">
+              <summary className="ui-interactive cursor-pointer">
+                Reward token details (
+                {row.bribeTokens.length}
+                )
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {row.bribeTokens.map((token, index) => (
+                  <li key={index}>
+                    {token.symbol}
+                    :
+                    {' '}
+                    {formatNumber(token.amount, 4)}
+                    {' '}
+                    ·
+                    {' '}
+                    {formatCompactUsd(token.amountUsd)}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       </div>
 

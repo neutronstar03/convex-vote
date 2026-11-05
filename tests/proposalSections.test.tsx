@@ -1,6 +1,9 @@
 import type { PoolRow } from '../src/features/proposal/types'
 import { describe, expect, it } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readMarketState, updateMarketState } from '../src/features/proposal/market-state'
+import { MarketFilters } from '../src/features/proposal/ui/gauge-market'
+import { summarizeWalletPosition } from '../src/features/proposal/ui/wallet-position'
 import { formatRelativeTime, formatTimeRemaining, GaugeRow, StatusNote } from '../src/routes/proposal'
 
 const NOW = 1_700_000_000_000
@@ -135,5 +138,42 @@ describe('StatusNote', () => {
 
     expect(markup).not.toContain('role="alert"')
     expect(markup).toContain('Connect a wallet to submit a vote')
+  })
+})
+
+describe('shareable proposal market', () => {
+  it('restores filters from links and preserves unrelated context when editing or clearing', () => {
+    const params = new URLSearchParams('watch=0x123&sort=votes&search=AQUA&token=AQUA&walletOnly=1&custom=keep')
+    expect(readMarketState(params)).toEqual({ sortKey: 'votes', searchTerm: 'AQUA', rewardTokenFilter: 'AQUA', showOnlyWalletVotes: true })
+    const next = updateMarketState(params, { search: 'new', sort: null, token: null, walletOnly: null })
+    expect(next.get('watch')).toBe('0x123')
+    expect(next.get('custom')).toBe('keep')
+    expect(readMarketState(next)).toEqual({ sortKey: 'incentives', searchTerm: 'new', rewardTokenFilter: 'all', showOnlyWalletVotes: false })
+    expect(readMarketState(new URLSearchParams('sort=unknown&walletOnly=false')).sortKey).toBe('incentives')
+  })
+
+  it('makes the active sort explicit and exposes all supported sorts', () => {
+    const markup = renderToStaticMarkup(<MarketFilters searchTerm="" onSearchTermChange={noop} rewardTokenFilter="all" rewardTokenOptions={['all', 'AQUA']} onRewardTokenFilterChange={noop} sortKey="votes" onSortKeyChange={noop} showOnlyWalletVotes={false} onShowOnlyWalletVotesChange={noop} canFilterWalletVotes isFiltered={false} onReset={noop} />)
+    expect(markup).toContain('aria-label="Sort gauges"')
+    expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1)
+    expect(markup).toContain('Vote share')
+    expect(markup).toContain('Only my voted gauges')
+  })
+
+  it('exposes every reward token and only safe pool references', () => {
+    const row = { ...poolRow, poolUrls: ['javascript:alert(1)', 'https://curve.finance/pool'], bribeTokens: Array.from({ length: 5 }, (_, index) => ({ symbol: `T${index}`, amount: index + 1, amountUsd: 100 })) }
+    const markup = renderToStaticMarkup(<GaugeRow {...rowProps({ row, isReadOnly: true })} />)
+    expect(markup).toContain('Reward token details (5)')
+    expect(markup).toContain('T4')
+    expect(markup).toContain('https://curve.finance/pool')
+    expect(markup).not.toContain('javascript:')
+    expect(markup).not.toContain('Add to ballot')
+  })
+
+  it('aggregates known estimates without treating missing rewards as zero', () => {
+    const recap = { choiceKey: poolRow.choiceKey, label: poolRow.label, weight: 50, estimatedVotes: poolRow.votes / 2, estimatedUsd: 100, estimatedTokenSummary: '' }
+    const summary = summarizeWalletPosition([{ recap, row: poolRow }, { recap: { ...recap, choiceKey: 'other', estimatedUsd: undefined } }])
+    expect(summary).toMatchObject({ gaugeCount: 2, estimatedUsd: 100, incomplete: true, topGauge: recap, tokens: [{ symbol: 'AQUA', amount: 500 }] })
+    expect(summarizeWalletPosition([{ recap: { ...recap, estimatedUsd: undefined } }]).estimatedUsd).toBeUndefined()
   })
 })

@@ -59,6 +59,24 @@ export interface WalletPositionRow {
   row?: PoolRow
 }
 
+export function summarizeWalletPosition(rows: WalletPositionRow[]) {
+  const estimates = rows.flatMap(({ recap }) => recap.estimatedUsd === undefined ? [] : [recap])
+  const tokens = new Map<string, number>()
+  for (const { recap, row } of rows) {
+    if (!row || row.votes <= 0)
+      continue
+    for (const token of row.bribeTokens)
+      tokens.set(token.symbol, (tokens.get(token.symbol) ?? 0) + token.amount * recap.estimatedVotes / row.votes)
+  }
+  return {
+    gaugeCount: rows.length,
+    estimatedUsd: estimates.length ? estimates.reduce((sum, recap) => sum + recap.estimatedUsd!, 0) : undefined,
+    incomplete: estimates.length !== rows.length,
+    topGauge: [...estimates].sort((a, b) => b.estimatedUsd! - a.estimatedUsd!)[0],
+    tokens: Array.from(tokens, ([symbol, amount]) => ({ symbol, amount })),
+  }
+}
+
 export interface WalletPositionPanelProps {
   activeAddress: string
   isWatchMode: boolean
@@ -82,6 +100,7 @@ export function WalletPositionPanel({
   errorMessage,
   onRetry,
 }: WalletPositionPanelProps) {
+  const summary = summarizeWalletPosition(rows)
   return (
     <Panel className="p-4 sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -106,6 +125,20 @@ export function WalletPositionPanel({
             : null}
         </p>
       </div>
+
+      {!isPending && !isError && rows.length > 0 && (
+        <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-inset)] p-4" aria-label="Wallet reward summary">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MiniStat tone="aqua" label="Voted gauges" value={String(summary.gaugeCount)} />
+            <MiniStat tone="lime" label="Total estimated reward" value={formatCompactUsd(summary.estimatedUsd)} detail={summary.incomplete ? 'Partial estimate: some rewards are unavailable' : 'Estimate, not a claimable balance'} />
+            <MiniStat tone="aqua" label="Top estimated reward gauge" value={summary.topGauge?.label ?? 'Unavailable'} />
+          </div>
+          <p className="mt-3 text-xs text-[var(--color-text-muted)]">
+            Reward token exposure:
+            {summary.tokens.length ? summary.tokens.map(token => `~${formatTokenAmount(token.amount)} ${token.symbol}`).join(' + ') : 'Unavailable'}
+          </p>
+        </div>
+      )}
 
       {isPending
         ? (
