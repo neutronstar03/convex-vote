@@ -31,19 +31,41 @@ const votedGaugeSchema = gaugeSchema.extend({
   votedVlcvx: nonNegativeNumberSchema,
 })
 
+const proposalMetadataSchema = z.object({
+  startTime: z.number().int().nonnegative(),
+  endTime: z.number().int().nonnegative(),
+  epoch: z.number().int().nonnegative(),
+  proposalId: z.number().int().nonnegative(),
+  platformId: z.literal('curve'),
+})
+
+const proposalSchema = proposalMetadataSchema.extend({
+  totalVotedVlcvx: nonNegativeNumberSchema,
+  voterCount: z.number().int().nonnegative(),
+  allGaugeVotes: z.array(votedGaugeSchema),
+})
+
 const currentProposalResponseSchema = z.object({
-  currentProposal: z.object({
-    startTime: z.number().int().nonnegative(),
-    endTime: z.number().int().nonnegative(),
-    epoch: z.number().int().nonnegative(),
-    proposalId: z.number().int().nonnegative(),
-    platformId: z.literal('curve'),
-    totalVotedVlcvx: nonNegativeNumberSchema,
-    voterCount: z.number().int().nonnegative(),
-    allGaugeVotes: z.array(votedGaugeSchema),
-  }).nullable(),
+  currentProposal: proposalSchema.nullable(),
   activeGaugesData: z.array(gaugeSchema),
 })
+
+const roundIdsSchema = z.array(z.number().int().nonnegative())
+const currentMetadataResponseSchema = z.object({
+  currentProposal: proposalMetadataSchema.passthrough().nullable(),
+  activeGaugesData: z.array(gaugeSchema),
+  pastProposalIds: roundIdsSchema,
+})
+const historicalResponseSchema = z.object({
+  previousProposal: proposalSchema,
+})
+const tallySchema = z.object({
+  proposalId: z.number().int().nonnegative(),
+  totalVotedVlcvx: nonNegativeNumberSchema,
+  voterCount: z.number().int().nonnegative(),
+  gaugeVotes: z.record(addressSchema, nonNegativeNumberSchema),
+})
+const PROPOSAL_ID_PATTERN = /^(?:0|[1-9]\d*)$/
 
 type RawGauge = z.infer<typeof gaugeSchema>
 type RawVotedGauge = z.infer<typeof votedGaugeSchema>
@@ -142,25 +164,84 @@ export function parseCurrentGaugeRound(input: unknown): GaugeRound | null {
   }
 }
 
-export async function fetchCurrentGaugeRound() {
-  const response = await fetch(CONVEX_CURRENT_PROPOSAL_URL, {
-    headers: { Accept: 'application/json' },
-  })
-
+async function fetchConvexJson(url: string): Promise<unknown> {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } })
   if (!response.ok)
-    throw new Error(`Convex current proposal request failed with ${response.status}`)
+    throw new Error(`Convex proposal request failed with ${response.status}`)
+  return response.json()
+}
 
-  return parseCurrentGaugeRound(await response.json())
+async function fetchCurrentMetadataPayload() {
+  return currentMetadataResponseSchema.parse(await fetchConvexJson(CONVEX_CURRENT_PROPOSAL_URL))
+}
+
+async function resolveCurrentPayload(payload: z.infer<typeof currentMetadataResponseSchema>) {
+  if (payload.currentProposal === null)
+    return { ...payload, currentProposal: null }
+
+  // Convex publishes current metadata separately from the live vote tally.
+  if ('allGaugeVotes' in payload.currentProposal)
+    return { ...payload, currentProposal: proposalSchema.parse(payload.currentProposal) }
+
+  const tally = tallySchema.parse(await fetchConvexJson(`/api/convex/proposal/${payload.currentProposal.proposalId}/tally`))
+  if (tally.proposalId !== payload.currentProposal.proposalId)
+    throw new Error('Convex tally does not match the requested round')
+  const votes = new Map(Object.entries(tally.gaugeVotes).map(([key, value]) => [normalizeAddress(key), value]))
+  return {
+    ...payload,
+    currentProposal: {
+      ...payload.currentProposal,
+      ...tally,
+      allGaugeVotes: payload.activeGaugesData.map(gauge => ({
+        ...gauge,
+        votedVlcvx: votes.get(normalizeAddress(gauge.gaugeAddress)) ?? votes.get(normalizeAddress(gauge.rootGaugeAddress)) ?? 0,
+      })),
+    },
+  }
+}
+
+export async function fetchCurrentGaugeRound() {
+  return parseCurrentGaugeRound(await resolveCurrentPayload(await fetchCurrentMetadataPayload()))
+}
+
+export async function fetchRoundIds() {
+  const payload = z.object({
+    currentProposal: proposalMetadataSchema.nullable(),
+    pastProposalIds: roundIdsSchema,
+  }).parse(await fetchConvexJson(CONVEX_CURRENT_PROPOSAL_URL))
+  return [...new Set([
+    ...payload.pastProposalIds,
+    ...(payload.currentProposal ? [payload.currentProposal.proposalId] : []),
+  ])].sort((a, b) => b - a)
+}
+
+export async function fetchHistoricalGaugeRound(id: number) {
+  if (!Number.isSafeInteger(id) || id < 0)
+    throw new Error('Invalid Convex proposal id')
+  const payload = historicalResponseSchema.parse(await fetchConvexJson(`/api/convex/proposal/${id}`))
+  const previous = payload.previousProposal
+  if (previous.proposalId !== id || previous.endTime > Date.now() / 1000)
+    throw new Error('Convex historical response does not match a completed round')
+  // Historical gauges come from the archived round, never today's catalogue.
+  const round = parseCurrentGaugeRound({ currentProposal: previous, activeGaugesData: previous.allGaugeVotes })!
+  return { ...round, state: 'closed' as const }
+}
+
+export async function fetchDashboardRound() {
+  const payload = await resolveCurrentPayload(await fetchCurrentMetadataPayload())
+  const current = parseCurrentGaugeRound(payload)
+  if (current)
+    return current
+  const previousId = [...payload.pastProposalIds].sort((a, b) => b - a)[0]
+  return previousId === undefined ? null : fetchHistoricalGaugeRound(previousId)
 }
 
 export async function fetchProposalById(id: string) {
-  const round = await fetchCurrentGaugeRound()
-
-  if (round === null)
-    throw new Error('No active gauge round is available; historical gauge rounds are not available')
-
-  if (round.id !== id && String(round.proposalId) !== id)
-    throw new Error('Historical gauge rounds are not available')
-
-  return round
+  const payload = await fetchCurrentMetadataPayload()
+  const current = payload.currentProposal
+  if (current && (String(current.proposalId) === id || `convex-curve:${current.epoch}:${current.endTime}` === id))
+    return parseCurrentGaugeRound(await resolveCurrentPayload(payload))!
+  if (!PROPOSAL_ID_PATTERN.test(id))
+    throw new Error('Invalid Convex proposal id')
+  return fetchHistoricalGaugeRound(Number(id))
 }

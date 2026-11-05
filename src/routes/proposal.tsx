@@ -3,10 +3,11 @@ import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
-import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
+import { RoundHistory } from '../components/shared/round-history'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
+import { WatchAddressPanel } from '../components/shared/watch-address'
 import { Eyebrow, Panel } from '../components/ui/primitives'
 import { useEpochForRound, usePreviousEpoch } from '../features/incentives/queries'
 import { getBribeDataAnomaly, mergeProposalAndEpoch } from '../features/incentives/utils'
@@ -24,6 +25,7 @@ import { useConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { useSubmitVote } from '../features/voting/use-submit-vote'
 import { cn } from '../lib/cn'
 import { formatCompactUsd, formatDateCompact, formatDateTime, formatNumber, getCurrentTimeZone } from '../lib/format'
+import { resolveWatchAddress } from '../lib/watch-address'
 
 const CONVEX_GOVERNANCE_URL = 'https://www.convexfinance.com/vote/weights/curve'
 
@@ -48,11 +50,7 @@ export function ProposalRoute() {
   const proposal = proposalQuery.data
   const epochQuery = useEpochForRound(proposal)
   const previousEpochQuery = usePreviousEpoch(epochQuery.data?.round)
-  const watchParam = searchParams.get('watch')?.trim()
-  const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
-  const activeAddress = watchedAddress ?? address
-  const isWatchMode = Boolean(watchedAddress)
-  const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
+  const { activeAddress, isWatchMode, isInvalid: hasInvalidWatchAddress } = resolveWatchAddress(searchParams, address)
   const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
   const { allocations: draftAllocations, setAllocations: setDraftAllocations, initialize: initializeDraft, reset: resetDraft } = useBallotDraft(
     proposal?.id,
@@ -136,6 +134,8 @@ export function ProposalRoute() {
   if (proposalQuery.isPending) {
     return (
       <AppShell>
+        <WatchAddressPanel />
+        <RoundHistory round={proposal} />
         <Panel className="p-6 sm:p-8">
           <p className="flex items-center gap-3 text-[var(--color-text-muted)]">
             <span className="size-4 animate-spin rounded-full border-2 border-[var(--color-info)] border-t-transparent" aria-hidden="true" />
@@ -149,6 +149,8 @@ export function ProposalRoute() {
   if (proposalQuery.isError) {
     return (
       <AppShell>
+        <WatchAddressPanel />
+        <RoundHistory round={proposal} />
         <div className="space-y-3">
           <StatusNote
             tone="danger"
@@ -173,6 +175,8 @@ export function ProposalRoute() {
   if (!proposal) {
     return (
       <AppShell>
+        <WatchAddressPanel />
+        <RoundHistory round={proposal} />
         <Panel className="p-6 sm:p-8">
           <div className="max-w-2xl" data-testid="proposal-no-active-round">
             <Tag tone="neutral">Between rounds</Tag>
@@ -208,7 +212,7 @@ export function ProposalRoute() {
       ? `Ends ${formatDateTime(resolvedProposal.end)}`
       : resolvedProposal.state
   const dashboardLink = activeAddress ? `/?watch=${activeAddress}` : '/'
-  const canVote = resolvedProposal.state === 'active' && !isWatchMode
+  const canVote = resolvedProposal.state === 'active' && !isWatchMode && !hasInvalidWatchAddress
   const incentiveState: IncentiveSourceState = epochQuery.isError
     ? 'error'
     : epochQuery.isPending
@@ -221,7 +225,7 @@ export function ProposalRoute() {
   const isFiltered = searchTerm.trim().length > 0 || rewardTokenFilter !== 'all' || showOnlyWalletVotes || sortKey !== 'incentives'
   const marketSummary = incentiveState === 'ready'
     ? [
-        `${formatNumber(bribedRows.length, 0)} of ${formatNumber(resolvedProposal.gauges.length, 0)} eligible gauges carry active Llama incentives`,
+        `${formatNumber(bribedRows.length, 0)} of ${formatNumber(resolvedProposal.gauges.length, 0)} gauges in this source carry matched Llama incentives`,
         epoch ? `Llama round ${epoch.round}` : null,
         `Total incentives ${formatCompactUsd(totalIncentivesUsd)}`,
         rewardTokenSummary === 'None' ? null : `Reward tokens ${rewardTokenSummary}`,
@@ -333,16 +337,19 @@ export function ProposalRoute() {
 
   return (
     <AppShell>
+      <WatchAddressPanel />
+      <RoundHistory round={proposal} />
       <Panel className="p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Eyebrow>Proposal overview</Eyebrow>
+              <Eyebrow>{resolvedProposal.state === 'closed' ? 'Historical proposal · Read-only estimates' : 'Proposal overview'}</Eyebrow>
               <Tag tone={resolvedProposal.state === 'active' ? 'positive' : 'neutral'}>{capitalize(resolvedProposal.state)}</Tag>
               {isWatchMode
                 ? (
                     <Tag tone="info">
                       Read-only watch
+                      {' '}
                       {shortAddress(activeAddress)}
                     </Tag>
                   )
@@ -399,7 +406,7 @@ export function ProposalRoute() {
                   </button>
                 )
               : null}
-            <a href={CONVEX_GOVERNANCE_URL} target="_blank" rel="noreferrer" className={SECONDARY_ACTION_CLASS}>
+            <a href={`${CONVEX_GOVERNANCE_URL}/${resolvedProposal.proposalId}`} target="_blank" rel="noreferrer" className={SECONDARY_ACTION_CLASS}>
               <ExternalLink className="size-4" aria-hidden="true" />
               Open Convex Governance
             </a>
@@ -433,6 +440,7 @@ export function ProposalRoute() {
       />
 
       <IncentiveMarketPanel
+        historical={resolvedProposal.state === 'closed'}
         incentiveState={incentiveState}
         anomaly={bribeDataAnomaly}
         summary={marketSummary}

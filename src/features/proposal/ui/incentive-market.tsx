@@ -12,6 +12,7 @@ import { INLINE_BUTTON_CLASS } from './styles'
 export type IncentiveSourceState = 'loading' | 'error' | 'unmatched' | 'ready'
 
 export interface IncentiveMarketPanelProps {
+  historical?: boolean
   incentiveState: IncentiveSourceState
   anomaly: BribeDataAnomaly | null
   /** One-line provenance summary shown under the section heading. */
@@ -38,6 +39,7 @@ export interface IncentiveMarketPanelProps {
 }
 
 export function IncentiveMarketPanel({
+  historical = false,
   incentiveState,
   anomaly,
   summary,
@@ -155,8 +157,8 @@ export function IncentiveMarketPanel({
       {incentiveState === 'unmatched'
         ? (
             <div className="mt-3">
-              <StatusNote tone="warning" title="No Llama round matched to this voting window yet">
-                Llama Airforce has not published a Votium round for this Convex window. Incentive figures can appear while the vote is open.
+              <StatusNote tone="warning" title={historical ? 'No archived incentive snapshot matched this voting window' : 'No Llama round matched to this voting window yet'}>
+                {historical ? 'Historical incentives are unavailable for this window. Figures from other rounds are not substituted.' : 'Llama Airforce has not published a Votium round for this Convex window. Incentive figures can appear while the vote is open.'}
               </StatusNote>
             </div>
           )
@@ -171,7 +173,7 @@ export function IncentiveMarketPanel({
                 {formatCompactUsd(totalIncentivesUsd)}
                 {' across 0 gauges'}
                 {roundNumber ? ` in round ${roundNumber}` : ''}
-                . Incentives are often added while the vote is open, so it is worth checking again before the window closes.
+                {historical ? '. This is the archived incentive snapshot for the selected window.' : '. Incentives are often added while the vote is open, so it is worth checking again before the window closes.'}
               </StatusNote>
             </div>
           )

@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 const LLAMA_PROXY_PREFIX_REGEX = /^\/api\/llama/
+const CONVEX_PROPOSAL_PROXY_PATTERN = /^\/api\/convex\/proposal\/(0|[1-9]\d*)(\/tally)?$/
 const CONVEX_CURRENT_PROXY_PATH = '/api/convex/current'
 
 function getGitSha(): string | undefined {
@@ -29,6 +30,14 @@ export default defineConfig({
         target: 'https://api.llama.airforce',
         changeOrigin: true,
         rewrite: path => path.replace(LLAMA_PROXY_PREFIX_REGEX, ''),
+      },
+      '/api/convex/proposal/': {
+        target: 'https://www.convexfinance.com',
+        changeOrigin: true,
+        rewrite: (path) => {
+          const match = CONVEX_PROPOSAL_PROXY_PATTERN.exec(path)
+          return match ? `/api/vote/weights/curve/proposal/${match[1]}${match[2] ?? ''}` : '/invalid-proposal'
+        },
       },
       [CONVEX_CURRENT_PROXY_PATH]: {
         target: 'https://www.convexfinance.com',

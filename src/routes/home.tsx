@@ -3,10 +3,11 @@ import type { ConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { ArrowRight, ExternalLink } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { isAddress } from 'viem'
 import { useAccount } from 'wagmi'
 import { AppShell } from '../components/layout/app-shell'
+import { RoundHistory } from '../components/shared/round-history'
 import { VoteSummaryStats } from '../components/shared/vote-summary-stats'
+import { WatchAddressPanel } from '../components/shared/watch-address'
 import { Eyebrow, Panel, StatusBadge } from '../components/ui/primitives'
 import { useEpochForRound } from '../features/incentives/queries'
 import { getBribedVotesTotal, mergeProposalAndEpoch } from '../features/incentives/utils'
@@ -14,18 +15,15 @@ import { useResolvedProposal } from '../features/proposal/queries'
 import { getCountdownParts } from '../features/proposal/utils'
 import { useConvexUserVote } from '../features/voting/use-convex-user-vote'
 import { formatCompactUsd, formatDateCompact, formatDateTimeCompact, formatDateTimeMs, formatNumber, getCurrentTimeZone } from '../lib/format'
+import { resolveWatchAddress } from '../lib/watch-address'
 
 export function HomeRoute() {
   const { address, isConnected } = useAccount()
   const [searchParams] = useSearchParams()
-  const proposalQuery = useResolvedProposal()
+  const proposalQuery = useResolvedProposal(searchParams.get('round') ?? undefined)
   const proposal = proposalQuery.data
   const epochQuery = useEpochForRound(proposal)
-  const watchParam = searchParams.get('watch')?.trim()
-  const watchedAddress = watchParam && isAddress(watchParam) ? watchParam : undefined
-  const hasInvalidWatchAddress = Boolean(watchParam) && !watchedAddress
-  const activeAddress = watchedAddress ?? address
-  const isWatchMode = Boolean(watchedAddress)
+  const { activeAddress, isWatchMode, isInvalid: hasInvalidWatchAddress } = resolveWatchAddress(searchParams, address)
   const showWalletPanel = Boolean(activeAddress || hasInvalidWatchAddress || isConnected)
   const voteQuery = useConvexUserVote(proposal?.proposalId, activeAddress)
   const [now, setNow] = useState(() => Date.now())
@@ -40,7 +38,7 @@ export function HomeRoute() {
 
   const timeZone = useMemo(() => getCurrentTimeZone(), [])
   const voteWindow = proposal ? getVoteWindowState(proposal.start, proposal.end, now) : null
-  const currentVoteLabel = epochQuery.data?.round ? `Current vote ${epochQuery.data.round}` : 'Current vote'
+  const currentVoteLabel = proposal?.state === 'closed' ? 'Completed vote · Historical' : epochQuery.data?.round ? `Current vote ${epochQuery.data.round}` : 'Current vote'
   const totalIncentivesUsd = epochQuery.data?.bribes.reduce((sum, bribe) => sum + bribe.amountDollars, 0)
   const summaryVotes = proposal ? getBribedVotesTotal(proposal, epochQuery.data ?? null) : 0
   const rewardRate = totalIncentivesUsd !== undefined && summaryVotes > 0
@@ -51,8 +49,8 @@ export function HomeRoute() {
     [proposal, epochQuery.data],
   )
   const walletVoteRecap = useMemo(
-    () => proposal && voteQuery.data?.voted ? getWalletVoteRecap(voteQuery.data, proposal.gauges, poolRows) : [],
-    [poolRows, proposal, voteQuery.data],
+    () => proposal && voteQuery.data?.voted ? getWalletVoteRecap(voteQuery.data, proposal.gauges, epochQuery.data ? poolRows : []) : [],
+    [poolRows, proposal, voteQuery.data, epochQuery.data],
   )
   const hasWalletVote = walletVoteRecap.length > 0
   const urgencyClass = voteWindow?.status === 'open' && voteWindow.totalHoursLeft !== undefined && voteWindow.totalHoursLeft < 6
@@ -64,6 +62,8 @@ export function HomeRoute() {
   if (proposalQuery.isError) {
     return (
       <AppShell>
+        <WatchAddressPanel />
+        <RoundHistory round={proposal} dashboard />
         <Panel className="border-[var(--color-danger)]/40 bg-[color:rgba(255,77,115,0.1)] p-6 text-[var(--color-text)] sm:p-8" data-testid="home-proposal-error">
           <h1 className="text-xl font-semibold">Unable to check the current Convex vote</h1>
           <p className="mt-2 text-sm text-[var(--dust-tint)]">
@@ -86,6 +86,8 @@ export function HomeRoute() {
   if (proposalQuery.isSuccess && proposal === null) {
     return (
       <AppShell>
+        <WatchAddressPanel />
+        <RoundHistory round={proposal} dashboard />
         <Panel className="p-6 sm:p-8" data-testid="home-no-active-round">
           <div className="max-w-2xl">
             <span className="rounded-md border border-[var(--steel-haze)] bg-[var(--carbon-ink)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--dust-tint)]">
@@ -118,6 +120,8 @@ export function HomeRoute() {
 
   return (
     <AppShell>
+      <WatchAddressPanel />
+      <RoundHistory round={proposal} dashboard />
       {proposal
         ? (
             <>
@@ -128,6 +132,7 @@ export function HomeRoute() {
                 totalIncentivesUsd={totalIncentivesUsd}
               />
               <DataHealthStrip
+                historical={proposal.state === 'closed'}
                 convexUpdatedAt={proposalQuery.dataUpdatedAt}
                 convexState={getConvexDataState(proposalQuery)}
                 llamaUpdatedAt={epochQuery.dataUpdatedAt}
@@ -187,7 +192,7 @@ export function HomeRoute() {
 
             <div className={`flex flex-wrap gap-2 ${hasWalletVote ? 'self-end' : ''}`}>
               <Link
-                to="/proposal/latest"
+                to={proposal ? `/proposal/${proposal.proposalId}${searchParams.has('watch') ? `?${new URLSearchParams({ watch: searchParams.get('watch') ?? '' })}` : ''}` : '/proposal/latest'}
                 data-testid="home-open-proposal-link"
                 className="inline-flex items-center gap-2 rounded-md bg-[var(--hyper-magenta)] px-4 py-2 text-sm font-medium text-[var(--cloud-tint)] transition hover:brightness-110"
               >
@@ -214,7 +219,7 @@ export function HomeRoute() {
             data-testid="wallet-vote-recap-pill"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--fog-tint)]">Current wallet vote</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--fog-tint)]">Wallet allocation for this round</p>
               {isWatchMode
                 ? <span className="rounded-md border border-[var(--pearl-aqua)]/40 bg-[color:rgba(120,218,228,0.1)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--pearl-aqua)]">Watching wallet</span>
                 : null}
@@ -244,63 +249,70 @@ export function HomeRoute() {
 
                     {voteQuery.isPending
                       ? <p className="mt-3 text-sm text-[var(--dust-tint)]">Loading current vote…</p>
-                      : voteQuery.data?.voted
+                      : voteQuery.isError
                         ? (
-                            <>
-                              <p className="mt-4 text-sm text-[var(--dust-tint)]">
-                                Voting power:
-                                {' '}
-                                {formatNumber(voteQuery.data.votingPower, 0)}
-                              </p>
-                              <ul className={`mt-4 ${hasWalletVote ? 'space-y-3.5' : 'space-y-3'} text-sm text-[var(--dust-tint)]`} data-testid="wallet-vote-recap-list">
-                                {walletVoteRecap.slice(0, 4).map(item => (
-                                  <li key={item.label} className={`rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/55 ${hasWalletVote ? 'px-3.5 py-3.5' : 'px-3 py-3'}`}>
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <p className="truncate text-[15px] font-semibold text-[var(--cloud-tint)]">{item.label}</p>
-                                        <p className="mt-1 text-xs leading-5 text-[var(--fog-tint)]">
-                                          Your voting weight
-                                          {' '}
-                                          {formatNumber(item.estimatedVotes, 0)}
-                                          {item.bribeTokenSummary ? ` · Rewards: ${item.bribeTokenSummary}` : ' · Rewards: none detected'}
-                                        </p>
-                                      </div>
-                                      <span className="shrink-0 text-lg font-semibold text-[var(--lime-cream)]">
-                                        {item.weight.toFixed(2)}
-                                        %
-                                      </span>
-                                    </div>
-
-                                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--slate-machine)]">
-                                      <div
-                                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--hyper-magenta),var(--pearl-aqua))]"
-                                        style={{ width: `${Math.min(item.weight, 100)}%` }}
-                                      />
-                                    </div>
-
-                                    <div className={`mt-3 grid gap-2 text-xs text-[var(--dust-tint)] ${hasWalletVote ? 'xl:grid-cols-2' : 'sm:grid-cols-2'}`}>
-                                      <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
-                                        <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Total bribes</p>
-                                        <p className="mt-1 text-lg font-semibold text-[var(--pearl-aqua)]">{formatCompactUsd(item.incentiveUsd)}</p>
-                                        <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.rewardRateLabel}</p>
-                                      </div>
-
-                                      <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
-                                        <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Your est. reward</p>
-                                        <p className="mt-1 text-lg font-semibold text-[var(--lime-cream)]">{formatCompactUsd(item.estimatedUsd)}</p>
-                                        <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.estimatedTokenSummary}</p>
-                                      </div>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-
-                              <p className="mt-3 text-xs text-[var(--fog-tint)]">
-                                Estimates assume rewards are distributed pro rata to final vote weight and may differ from final claimable amounts.
-                              </p>
-                            </>
+                            <p role="alert" className="mt-3 text-sm text-[var(--color-danger)]">
+                              Wallet allocation unavailable.
+                              <button type="button" className="underline" onClick={() => voteQuery.refetch()}>Retry allocation</button>
+                            </p>
                           )
-                        : <p className="mt-3 text-sm text-[var(--dust-tint)]">No direct on-chain vote found for this wallet. Delegated allocations are not shown yet.</p>}
+                        : voteQuery.data?.voted
+                          ? (
+                              <>
+                                <p className="mt-4 text-sm text-[var(--dust-tint)]">
+                                  Voting power:
+                                  {' '}
+                                  {formatNumber(voteQuery.data.votingPower, 0)}
+                                </p>
+                                <ul className={`mt-4 ${hasWalletVote ? 'space-y-3.5' : 'space-y-3'} text-sm text-[var(--dust-tint)]`} data-testid="wallet-vote-recap-list">
+                                  {walletVoteRecap.slice(0, 4).map(item => (
+                                    <li key={item.label} className={`rounded-md border border-[var(--steel-haze)] bg-[var(--gunmetal-mist)]/55 ${hasWalletVote ? 'px-3.5 py-3.5' : 'px-3 py-3'}`}>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="truncate text-[15px] font-semibold text-[var(--cloud-tint)]">{item.label}</p>
+                                          <p className="mt-1 text-xs leading-5 text-[var(--fog-tint)]">
+                                            Your voting weight
+                                            {' '}
+                                            {formatNumber(item.estimatedVotes, 0)}
+                                            {item.bribeTokenSummary ? ` · Rewards: ${item.bribeTokenSummary}` : ' · Rewards: none detected'}
+                                          </p>
+                                        </div>
+                                        <span className="shrink-0 text-lg font-semibold text-[var(--lime-cream)]">
+                                          {item.weight.toFixed(2)}
+                                          %
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--slate-machine)]">
+                                        <div
+                                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--hyper-magenta),var(--pearl-aqua))]"
+                                          style={{ width: `${Math.min(item.weight, 100)}%` }}
+                                        />
+                                      </div>
+
+                                      <div className={`mt-3 grid gap-2 text-xs text-[var(--dust-tint)] ${hasWalletVote ? 'xl:grid-cols-2' : 'sm:grid-cols-2'}`}>
+                                        <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
+                                          <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Total bribes</p>
+                                          <p className="mt-1 text-lg font-semibold text-[var(--pearl-aqua)]">{formatCompactUsd(item.incentiveUsd)}</p>
+                                          <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.rewardRateLabel}</p>
+                                        </div>
+
+                                        <div className="rounded-md border border-[var(--steel-haze)]/40 bg-[var(--carbon-ink)]/45 px-2.5 py-2">
+                                          <p className="uppercase tracking-[0.16em] text-[var(--fog-tint)]">Your est. reward</p>
+                                          <p className="mt-1 text-lg font-semibold text-[var(--lime-cream)]">{formatCompactUsd(item.estimatedUsd)}</p>
+                                          <p className="mt-1 text-[11px] text-[var(--fog-tint)]">{item.estimatedTokenSummary}</p>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+
+                                <p className="mt-3 text-xs text-[var(--fog-tint)]">
+                                  Estimates assume rewards are distributed pro rata to final vote weight and may differ from final claimable amounts.
+                                </p>
+                              </>
+                            )
+                          : <p className="mt-3 text-sm text-[var(--dust-tint)]">No direct on-chain vote found for this wallet. Delegated allocations are not shown yet.</p>}
                   </>
                 )}
           </aside>
@@ -310,7 +322,7 @@ export function HomeRoute() {
       <Panel className="p-3 sm:p-4" data-testid="vote-timetable-pill">
         <div className="grid gap-3 lg:grid-cols-[1fr_1.15fr_0.9fr]">
           <TimetableItem
-            label="Current vote"
+            label="Selected vote"
             value={epochQuery.data?.round ? `#${epochQuery.data.round}` : proposalQuery.isPending ? 'Loading…' : 'Unknown'}
             detail={proposal ? `${formatDateCompact(proposal.start)} → ${formatDateCompact(proposal.end)}` : 'Fetching latest proposal'}
             testId="current-vote-number"
@@ -336,7 +348,7 @@ export function HomeRoute() {
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">Convex voting state and Votium incentive data are read separately.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Link to="/proposal/latest" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-action)]/50 bg-[color:rgba(197,46,240,0.12)] px-3 py-2 font-semibold text-[var(--color-text)]" data-testid="home-latest-proposal-link">Full analytics →</Link>
+          <Link to={proposal ? `/proposal/${proposal.proposalId}${searchParams.has('watch') ? `?${new URLSearchParams({ watch: searchParams.get('watch') ?? '' })}` : ''}` : '/proposal/latest'} className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-action)]/50 bg-[color:rgba(197,46,240,0.12)] px-3 py-2 font-semibold text-[var(--color-text)]" data-testid="home-latest-proposal-link">Full analytics →</Link>
           <a href="https://www.convexfinance.com/vote/weights/curve" target="_blank" rel="noreferrer" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-3 py-2 font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)]" data-testid="home-convex-link">Convex Governance ↗</a>
           <a href="https://votium.app" target="_blank" rel="noreferrer" className="ui-interactive inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-3 py-2 font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)]">Votium ↗</a>
           <span className="inline-flex items-center rounded-full border border-[color:rgba(120,218,228,0.28)] bg-[color:rgba(120,218,228,0.08)] px-3 py-2 text-[var(--color-info)]" data-testid="home-timezone-pill">{timeZone}</span>
@@ -427,11 +439,13 @@ function getConvexDataState(query: { data: GaugeRound | null | undefined, isErro
 }
 
 function DataHealthStrip({
+  historical,
   convexState,
   convexUpdatedAt,
   llamaState,
   llamaUpdatedAt,
 }: {
+  historical: boolean
   convexState: DataState
   convexUpdatedAt: number
   llamaState: DataState
@@ -439,20 +453,20 @@ function DataHealthStrip({
 }) {
   return (
     <Panel className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4" data-testid="home-data-health">
-      <DataSourceStatus name="Convex on-chain" state={convexState} updatedAt={convexUpdatedAt} />
-      <DataSourceStatus name="Llama incentives" state={llamaState} updatedAt={llamaUpdatedAt} />
+      <DataSourceStatus historical={historical} name="Convex on-chain" state={convexState} updatedAt={convexUpdatedAt} />
+      <DataSourceStatus historical={historical} name="Llama incentives" state={llamaState} updatedAt={llamaUpdatedAt} />
     </Panel>
   )
 }
 
-function DataSourceStatus({ name, state, updatedAt }: { name: string, state: DataState, updatedAt: number }) {
+function DataSourceStatus({ name, state, updatedAt, historical }: { name: string, state: DataState, updatedAt: number, historical: boolean }) {
   const tone = state.kind === 'error' ? 'danger' : state.kind === 'ready' ? 'info' : 'neutral'
   return (
     <div className="ui-panel-inset flex min-w-0 items-start justify-between gap-3 px-3 py-3">
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-faint)]">{name}</p>
-        <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">{state.label}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--color-text-subtle)]">{state.detail}</p>
+        <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">{historical && state.kind === 'ready' ? 'Historical round data' : state.label}</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--color-text-subtle)]">{historical && state.kind === 'ready' ? 'Archived figures for the selected window; these are not live incentives or claimable balances.' : state.detail}</p>
         {state.kind === 'ready' && updatedAt > 0
           ? (
               <p className="mt-1 text-[11px] text-[var(--color-text-faint)]">
@@ -463,7 +477,7 @@ function DataSourceStatus({ name, state, updatedAt }: { name: string, state: Dat
             )
           : null}
       </div>
-      <StatusBadge tone={tone}>{state.kind === 'ready' ? 'Live' : state.kind === 'pending' ? 'Loading' : state.kind === 'error' ? 'Error' : 'Check'}</StatusBadge>
+      <StatusBadge tone={tone}>{state.kind === 'ready' ? historical ? 'Historical' : 'Live' : state.kind === 'pending' ? 'Loading' : state.kind === 'error' ? 'Error' : 'Check'}</StatusBadge>
     </div>
   )
 }

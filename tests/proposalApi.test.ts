@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import {
   fetchCurrentGaugeRound,
+  fetchDashboardRound,
+  fetchHistoricalGaugeRound,
   fetchProposalById,
+  fetchRoundIds,
   parseCurrentGaugeRound,
 } from '../src/features/proposal/api'
 
@@ -45,31 +48,83 @@ describe('current Convex gauge proposal API', () => {
     globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify({
       currentProposal: null,
       activeGaugesData: [],
+      pastProposalIds: [],
     }), { status: 200 }))) as typeof fetch
 
     await expect(fetchCurrentGaugeRound()).resolves.toBeNull()
   })
 
-  it('does not resolve an explicit proposal id from an inter-round response', async () => {
-    globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify({
-      currentProposal: null,
-      activeGaugesData: [],
-    }), { status: 200 }))) as typeof fetch
-
-    await expect(fetchProposalById('128')).rejects.toThrow('No active gauge round')
+  it('loads a requested historical round without merging the current gauge catalogue', async () => {
+    const previous = { ...activePayload().currentProposal, proposalId: 127 }
+    globalThis.fetch = ((url: string) => Promise.resolve(Response.json(
+      url.endsWith('/127') ? { previousProposal: previous } : activePayload(),
+    ))) as typeof fetch
+    const result = await fetchProposalById('127')
+    expect(result).toMatchObject({ proposalId: 127, state: 'closed' })
+    expect(result.gauges).toHaveLength(1)
+    expect(result.gauges[0].label).toBe('Gauge A vote entry')
   })
 
-  it('continues to reject historical proposal ids when a different round is active', async () => {
-    globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify(activePayload()), {
-      status: 200,
-    }))) as typeof fetch
+  it('can open historical data without fetching the current tally', async () => {
+    const { allGaugeVotes: _votes, totalVotedVlcvx: _total, voterCount: _voters, ...metadata } = activePayload().currentProposal
+    const paths: string[] = []
+    globalThis.fetch = ((url: string) => {
+      paths.push(url)
+      return Promise.resolve(Response.json(url.endsWith('/127')
+        ? { previousProposal: { ...activePayload().currentProposal, proposalId: 127 } }
+        : { ...activePayload(), currentProposal: metadata }))
+    }) as typeof fetch
+    await expect(fetchProposalById('127')).resolves.toMatchObject({ state: 'closed' })
+    expect(paths.some(path => path.endsWith('/tally'))).toBe(false)
+  })
 
-    await expect(fetchProposalById('127')).rejects.toThrow('Historical gauge rounds are not available')
+  it('keeps the latest completed round available between rounds', async () => {
+    globalThis.fetch = ((url: string) => Promise.resolve(Response.json(
+      url.endsWith('/128') ? { previousProposal: activePayload().currentProposal } : { currentProposal: null, activeGaugesData: [], pastProposalIds: [125, 128, 126] },
+    ))) as typeof fetch
+    await expect(fetchDashboardRound()).resolves.toMatchObject({ proposalId: 128, state: 'closed' })
+  })
+
+  it('returns null only when neither a current nor a previous round exists', async () => {
+    globalThis.fetch = (() => Promise.resolve(Response.json({ currentProposal: null, activeGaugesData: [], pastProposalIds: [] }))) as typeof fetch
+    await expect(fetchDashboardRound()).resolves.toBeNull()
+  })
+
+  it('uses the current round immediately when the next window opens', async () => {
+    globalThis.fetch = (() => Promise.resolve(Response.json(activePayload()))) as typeof fetch
+    await expect(fetchDashboardRound()).resolves.toMatchObject({ proposalId: 128 })
+    await expect(fetchRoundIds()).resolves.toEqual([128, 127, 126])
+  })
+
+  it('combines current metadata with a matching separately published tally', async () => {
+    const payload = activePayload()
+    const { totalVotedVlcvx: _total, voterCount: _count, allGaugeVotes: _votes, ...metadata } = payload.currentProposal
+    globalThis.fetch = ((url: string) => Promise.resolve(Response.json(
+      url.endsWith('/tally')
+        ? { proposalId: 128, totalVotedVlcvx: 99, voterCount: 4, gaugeVotes: { [GAUGE_A]: 99 } }
+        : { ...payload, currentProposal: metadata },
+    ))) as typeof fetch
+    const result = await fetchCurrentGaugeRound()
+    expect(result).toMatchObject({ totalVotes: 99, voterCount: 4 })
+    expect(result?.gauges.map(gauge => gauge.votes)).toEqual([99, 0])
+  })
+
+  it('rejects a mismatched or non-completed historical response', async () => {
+    globalThis.fetch = (() => Promise.resolve(Response.json({ previousProposal: activePayload().currentProposal }))) as typeof fetch
+    await expect(fetchHistoricalGaugeRound(127)).rejects.toThrow('does not match')
+    globalThis.fetch = (() => Promise.resolve(Response.json({ previousProposal: { ...activePayload().currentProposal, endTime: Math.ceil(Date.now() / 1000) + 1000 } }))) as typeof fetch
+    await expect(fetchHistoricalGaugeRound(128)).rejects.toThrow('completed round')
+  })
+
+  it('does not mask upstream failures as an empty history', async () => {
+    globalThis.fetch = (() => Promise.resolve(new Response('', { status: 503 }))) as typeof fetch
+    await expect(fetchHistoricalGaugeRound(128)).rejects.toThrow('503')
   })
 })
 
 function activePayload() {
   return {
+    pastProposalIds: [126, 127],
     currentProposal: {
       startTime: 1_775_059_200,
       endTime: 1_775_491_200,

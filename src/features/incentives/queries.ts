@@ -1,11 +1,11 @@
 import type { GaugeRound } from '../proposal/types'
 import { useQuery } from '@tanstack/react-query'
-import { fetchEpoch, fetchLatestEpochForRound } from './api'
+import { fetchEpoch, fetchEpochForVotingRound } from './api'
 
-export function useEpochForRound(round?: Pick<GaugeRound, 'end'> | null) {
+export function useEpochForRound(round?: Pick<GaugeRound, 'end' | 'state'> | null) {
   return useQuery({
-    queryKey: ['epoch', 'convex-onchain', round?.end],
-    queryFn: () => fetchLatestEpochForRound(round!.end),
+    queryKey: ['epoch', 'convex-onchain', round?.end, round?.state === 'closed'],
+    queryFn: () => fetchEpochForVotingRound(round!.end, round!.state === 'closed'),
     enabled: round !== undefined && round !== null,
     refetchInterval: 60_000,
   })

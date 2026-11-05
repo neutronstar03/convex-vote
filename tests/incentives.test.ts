@@ -1,7 +1,7 @@
 import type { LlamaEpoch } from '../src/features/incentives/types'
 import type { GaugeRound, HexAddress } from '../src/features/proposal/types'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { fetchLatestEpochForRound } from '../src/features/incentives/api'
+import { fetchEpochForVotingRound, fetchLatestEpochForRound } from '../src/features/incentives/api'
 import { getBribeDataAnomaly, mergeProposalAndEpoch } from '../src/features/incentives/utils'
 
 const originalFetch = globalThis.fetch
@@ -17,6 +17,20 @@ describe('Llama incentive data', () => {
 
     mockLatestEpoch(epoch({ round: 131, end: 2_000, gaugeCount: 1, bribesUsd: 10 }))
     await expect(fetchLatestEpochForRound(2_001)).resolves.toBeNull()
+  })
+
+  it('finds historical incentives by the exact end date rather than using current rewards', async () => {
+    let count = 0
+    globalThis.fetch = ((url: string) => {
+      count += 1
+      if (url.endsWith('/rounds'))
+        return Promise.resolve(Response.json({ rounds: Array.from({ length: 128 }, (_, index) => index + 1).reverse() }))
+      const round = Number(url.split('/').at(-1))
+      return Promise.resolve(Response.json({ epoch: epoch({ round, end: round * 1000, gaugeCount: 1, bribesUsd: round }) }))
+    }) as typeof fetch
+    await expect(fetchEpochForVotingRound(3000, true)).resolves.toMatchObject({ round: 3, end: 3000 })
+    expect(count).toBeLessThanOrEqual(9)
+    await expect(fetchEpochForVotingRound(3001, true)).resolves.toBeNull()
   })
 
   it('matches incentives by either gauge or root-gauge address', () => {

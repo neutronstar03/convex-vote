@@ -83,3 +83,24 @@ export async function fetchLatestEpochForRound(roundEnd: number): Promise<LlamaE
   const epoch = await fetchLatestEpoch()
   return epoch.voteSource === 'convex-onchain' && epoch.end === roundEnd ? epoch : null
 }
+
+/** Find an archived incentive window without borrowing figures from another round. */
+export async function fetchEpochForVotingRound(roundEnd: number, historical: boolean) {
+  if (!historical)
+    return fetchLatestEpochForRound(roundEnd)
+  const { rounds } = await fetchRounds()
+  const sorted = [...new Set(rounds)].sort((a, b) => a - b)
+  let low = 0
+  let high = sorted.length - 1
+  // Round ids and window ends are chronological; binary search bounds requests.
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2)
+    const epoch = await fetchEpoch(sorted[middle])
+    if (epoch.end === roundEnd)
+      return epoch
+    if (epoch.end < roundEnd)
+      low = middle + 1
+    else high = middle - 1
+  }
+  return null
+}
